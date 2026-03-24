@@ -1,0 +1,16 @@
+packages:
+  "recharts": "Required for analytics charts on the dashboard and analytics pages"
+  "date-fns": "For formatting and parsing dates in tables and charts"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility to safely merge Tailwind classes without style conflicts"
+  "react-hook-form": "For robust form state management"
+  "@hookform/resolvers": "For Zod validation integration with react-hook-form"
+
+images:
+  - path: "artifacts/procurement-monitor/public/images/auth-bg.png"
+    description: "Abstract dark navy and deep blue architectural rendering with soft lighting"
+    aspect_ratio: "16:9"
+
+notes:
+  - "Assuming all shadcn/ui components are available in @/components/ui/ as per standard Replit scaffold"
+  - "Using generated API hooks from @workspace/api-client-react"

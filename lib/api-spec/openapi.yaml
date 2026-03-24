@@ -3,13 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Public Sector Procurement Monitor API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: watchlist
+    description: Watchlist entry management
+  - name: alerts
+    description: Alert management
+  - name: scan
+    description: SAM.gov scan operations
+  - name: config
+    description: Application configuration
+  - name: analytics
+    description: Analytics and aggregated data
 paths:
   /healthz:
     get:
@@ -24,6 +34,355 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /watchlist:
+    get:
+      operationId: listWatchlistEntries
+      tags: [watchlist]
+      summary: List all watchlist entries
+      responses:
+        "200":
+          description: List of watchlist entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WatchlistEntry"
+    post:
+      operationId: createWatchlistEntry
+      tags: [watchlist]
+      summary: Create a new watchlist entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWatchlistEntryInput"
+      responses:
+        "201":
+          description: Created watchlist entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistEntry"
+
+  /watchlist/{id}:
+    get:
+      operationId: getWatchlistEntry
+      tags: [watchlist]
+      summary: Get a watchlist entry by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Watchlist entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistEntry"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateWatchlistEntry
+      tags: [watchlist]
+      summary: Update a watchlist entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWatchlistEntryInput"
+      responses:
+        "200":
+          description: Updated watchlist entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistEntry"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteWatchlistEntry
+      tags: [watchlist]
+      summary: Delete a watchlist entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted successfully
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: List alerts with optional filters
+      parameters:
+        - name: priority
+          in: query
+          schema:
+            type: string
+        - name: agencyMatchId
+          in: query
+          schema:
+            type: integer
+        - name: minMatchScore
+          in: query
+          schema:
+            type: number
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of alerts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertListResponse"
+
+  /alerts/{id}:
+    delete:
+      operationId: deleteAlert
+      tags: [alerts]
+      summary: Delete an alert
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted successfully
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /alerts/stats:
+    get:
+      operationId: getAlertStats
+      tags: [alerts]
+      summary: Get summary statistics for alerts
+      responses:
+        "200":
+          description: Alert statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertStats"
+
+  /scan:
+    post:
+      operationId: triggerScan
+      tags: [scan]
+      summary: Trigger a manual SAM.gov scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanRequest"
+      responses:
+        "200":
+          description: Scan started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanLog"
+    get:
+      operationId: listScanLogs
+      tags: [scan]
+      summary: List scan history
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: List of scan logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScanLog"
+
+  /scan/{id}:
+    get:
+      operationId: getScanLog
+      tags: [scan]
+      summary: Get a scan log by ID (for polling progress)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scan log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanLog"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /config:
+    get:
+      operationId: getConfig
+      tags: [config]
+      summary: Get all configuration values
+      responses:
+        "200":
+          description: Configuration object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppConfig"
+    put:
+      operationId: updateConfig
+      tags: [config]
+      summary: Update configuration values
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppConfig"
+      responses:
+        "200":
+          description: Updated configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppConfig"
+
+  /analytics/alerts-over-time:
+    get:
+      operationId: getAlertsOverTime
+      tags: [analytics]
+      summary: Get alerts grouped by date
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 90
+      responses:
+        "200":
+          description: Alerts over time data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AlertsOverTimePoint"
+
+  /analytics/alerts-by-priority:
+    get:
+      operationId: getAlertsByPriority
+      tags: [analytics]
+      summary: Get alerts grouped by priority
+      responses:
+        "200":
+          description: Alerts by priority data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AlertsByPriorityPoint"
+
+  /analytics/top-agencies:
+    get:
+      operationId: getTopAgencies
+      tags: [analytics]
+      summary: Get top agencies by alert count
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Top agencies data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopAgencyPoint"
+
+  /analytics/rebid-timeline:
+    get:
+      operationId: getRebidTimeline
+      tags: [analytics]
+      summary: Get watchlist rebid window timeline data
+      responses:
+        "200":
+          description: Rebid timeline data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RebidTimelineEntry"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +393,335 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    WatchlistEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        agency:
+          type: string
+        searchTerms:
+          type: array
+          items:
+            type: string
+        state:
+          type: string
+        tcv:
+          type: string
+        reason:
+          type: string
+        competitor:
+          type: string
+        rebidWindowStart:
+          type: string
+          nullable: true
+        rebidWindowEnd:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [HIGH, MEDIUM, WATCH, LOW]
+        notes:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - agency
+        - searchTerms
+        - state
+        - tcv
+        - reason
+        - competitor
+        - priority
+        - notes
+        - createdAt
+        - updatedAt
+
+    CreateWatchlistEntryInput:
+      type: object
+      properties:
+        agency:
+          type: string
+        searchTerms:
+          type: array
+          items:
+            type: string
+        state:
+          type: string
+        tcv:
+          type: string
+        reason:
+          type: string
+        competitor:
+          type: string
+        rebidWindowStart:
+          type: string
+          nullable: true
+        rebidWindowEnd:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [HIGH, MEDIUM, WATCH, LOW]
+        notes:
+          type: string
+      required:
+        - agency
+        - searchTerms
+        - state
+        - tcv
+        - reason
+        - competitor
+        - priority
+        - notes
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: integer
+        timestamp:
+          type: string
+        source:
+          type: string
+        agencyMatchId:
+          type: integer
+          nullable: true
+        watchlistAgency:
+          type: string
+        opportunityTitle:
+          type: string
+        solicitationNumber:
+          type: string
+        postedDate:
+          type: string
+        responseDeadline:
+          type: string
+        url:
+          type: string
+        matchScore:
+          type: string
+        watchlistTcv:
+          type: string
+        watchlistPriority:
+          type: string
+        noticeId:
+          type: string
+        notes:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - timestamp
+        - source
+        - watchlistAgency
+        - opportunityTitle
+        - solicitationNumber
+        - postedDate
+        - responseDeadline
+        - url
+        - matchScore
+        - watchlistTcv
+        - watchlistPriority
+        - noticeId
+        - notes
+        - createdAt
+
+    AlertListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Alert"
+        total:
+          type: integer
+      required:
+        - data
+        - total
+
+    AlertStats:
+      type: object
+      properties:
+        totalAlerts:
+          type: integer
+        highPriorityAlerts:
+          type: integer
+        uniqueAgencies:
+          type: integer
+        totalPipelineTcv:
+          type: number
+      required:
+        - totalAlerts
+        - highPriorityAlerts
+        - uniqueAgencies
+        - totalPipelineTcv
+
+    ScanRequest:
+      type: object
+      properties:
+        scanWindowDays:
+          type: integer
+          default: 30
+        useKeywords:
+          type: boolean
+          default: true
+        useNaics:
+          type: boolean
+          default: true
+      required:
+        - scanWindowDays
+        - useKeywords
+        - useNaics
+
+    ScanLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        startedAt:
+          type: string
+        completedAt:
+          type: string
+          nullable: true
+        scanWindowDays:
+          type: integer
+        totalOpportunities:
+          type: integer
+        totalAlerts:
+          type: integer
+        status:
+          type: string
+          enum: [running, completed, failed]
+        progressLog:
+          type: string
+        errorMessage:
+          type: string
+          nullable: true
+      required:
+        - id
+        - startedAt
+        - scanWindowDays
+        - totalOpportunities
+        - totalAlerts
+        - status
+        - progressLog
+
+    AppConfig:
+      type: object
+      properties:
+        samApiKeyConfigured:
+          type: boolean
+        scanWindowDays:
+          type: integer
+        matchThreshold:
+          type: number
+        searchKeywords:
+          type: array
+          items:
+            type: string
+        naicsCodes:
+          type: array
+          items:
+            type: string
+        scheduleEnabled:
+          type: boolean
+        scheduleTime:
+          type: string
+        emailEnabled:
+          type: boolean
+        emailSmtpServer:
+          type: string
+        emailSmtpPort:
+          type: integer
+        emailSenderEmail:
+          type: string
+        emailRecipients:
+          type: array
+          items:
+            type: string
+      required:
+        - samApiKeyConfigured
+        - scanWindowDays
+        - matchThreshold
+        - searchKeywords
+        - naicsCodes
+        - scheduleEnabled
+        - scheduleTime
+        - emailEnabled
+        - emailSmtpServer
+        - emailSmtpPort
+        - emailSenderEmail
+        - emailRecipients
+
+    AlertsOverTimePoint:
+      type: object
+      properties:
+        date:
+          type: string
+        count:
+          type: integer
+      required:
+        - date
+        - count
+
+    AlertsByPriorityPoint:
+      type: object
+      properties:
+        priority:
+          type: string
+        count:
+          type: integer
+      required:
+        - priority
+        - count
+
+    TopAgencyPoint:
+      type: object
+      properties:
+        agency:
+          type: string
+        count:
+          type: integer
+      required:
+        - agency
+        - count
+
+    RebidTimelineEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        agency:
+          type: string
+        priority:
+          type: string
+        tcv:
+          type: string
+        rebidWindowStart:
+          type: string
+          nullable: true
+        rebidWindowEnd:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [upcoming, active, closed]
+      required:
+        - id
+        - agency
+        - priority
+        - tcv
+        - status
