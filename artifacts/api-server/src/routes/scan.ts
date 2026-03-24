@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { scanLogsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
@@ -6,7 +6,7 @@ import { runScan } from "../services/samScanner";
 
 const router = Router();
 
-router.post("/scan", async (req, res) => {
+router.post("/scan", async (req: Request, res: Response): Promise<void> => {
   try {
     const { scanWindowDays = 30, useKeywords = true, useNaics = true } = req.body;
 
@@ -32,7 +32,7 @@ router.post("/scan", async (req, res) => {
   }
 });
 
-router.get("/scan", async (req, res) => {
+router.get("/scan", async (req: Request, res: Response): Promise<void> => {
   try {
     const limit = parseInt(String(req.query.limit ?? "20"), 10);
     const logs = await db
@@ -47,11 +47,14 @@ router.get("/scan", async (req, res) => {
   }
 });
 
-router.get("/scan/:id", async (req, res) => {
+router.get("/scan/:id", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     const [log] = await db.select().from(scanLogsTable).where(eq(scanLogsTable.id, id));
-    if (!log) return res.status(404).json({ error: "Not found" });
+    if (!log) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(log);
   } catch (err) {
     req.log.error({ err }, "Failed to get scan log");

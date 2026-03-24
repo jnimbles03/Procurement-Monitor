@@ -1,11 +1,11 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { watchlistEntriesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router = Router();
 
-router.get("/watchlist", async (req, res) => {
+router.get("/watchlist", async (req: Request, res: Response): Promise<void> => {
   try {
     const entries = await db.select().from(watchlistEntriesTable).orderBy(watchlistEntriesTable.id);
     res.json(entries);
@@ -15,13 +15,13 @@ router.get("/watchlist", async (req, res) => {
   }
 });
 
-router.post("/watchlist", async (req, res) => {
+router.post("/watchlist", async (req: Request, res: Response): Promise<void> => {
   try {
     const body = req.body;
     const searchTerms = Array.isArray(body.searchTerms)
-      ? body.searchTerms
+      ? (body.searchTerms as string[])
       : typeof body.searchTerms === "string"
-      ? body.searchTerms.split(",").map((s: string) => s.trim()).filter(Boolean)
+      ? (body.searchTerms as string).split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
     const [entry] = await db
@@ -47,11 +47,14 @@ router.post("/watchlist", async (req, res) => {
   }
 });
 
-router.get("/watchlist/:id", async (req, res) => {
+router.get("/watchlist/:id", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     const [entry] = await db.select().from(watchlistEntriesTable).where(eq(watchlistEntriesTable.id, id));
-    if (!entry) return res.status(404).json({ error: "Not found" });
+    if (!entry) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(entry);
   } catch (err) {
     req.log.error({ err }, "Failed to get watchlist entry");
@@ -59,14 +62,14 @@ router.get("/watchlist/:id", async (req, res) => {
   }
 });
 
-router.put("/watchlist/:id", async (req, res) => {
+router.put("/watchlist/:id", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     const body = req.body;
     const searchTerms = Array.isArray(body.searchTerms)
-      ? body.searchTerms
+      ? (body.searchTerms as string[])
       : typeof body.searchTerms === "string"
-      ? body.searchTerms.split(",").map((s: string) => s.trim()).filter(Boolean)
+      ? (body.searchTerms as string).split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
     const [entry] = await db
@@ -87,7 +90,10 @@ router.put("/watchlist/:id", async (req, res) => {
       .where(eq(watchlistEntriesTable.id, id))
       .returning();
 
-    if (!entry) return res.status(404).json({ error: "Not found" });
+    if (!entry) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(entry);
   } catch (err) {
     req.log.error({ err }, "Failed to update watchlist entry");
@@ -95,14 +101,17 @@ router.put("/watchlist/:id", async (req, res) => {
   }
 });
 
-router.delete("/watchlist/:id", async (req, res) => {
+router.delete("/watchlist/:id", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     const [deleted] = await db
       .delete(watchlistEntriesTable)
       .where(eq(watchlistEntriesTable.id, id))
       .returning();
-    if (!deleted) return res.status(404).json({ error: "Not found" });
+    if (!deleted) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete watchlist entry");

@@ -11,15 +11,57 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
+import type { TooltipProps } from 'recharts';
+import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const PRIORITY_COLORS = {
-  HIGH: 'hsl(0, 84%, 60%)',    // destructive
-  MEDIUM: 'hsl(38, 92%, 50%)', // amber-500
-  WATCH: 'hsl(221, 83%, 53%)', // primary
-  LOW: 'hsl(215, 16%, 47%)'    // muted-foreground
+const PRIORITY_COLORS: Record<string, string> = {
+  HIGH: 'hsl(0, 84%, 60%)',
+  MEDIUM: 'hsl(38, 92%, 50%)',
+  WATCH: 'hsl(221, 83%, 53%)',
+  LOW: 'hsl(215, 16%, 47%)'
 };
+
+function CustomTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-popover border border-border/50 p-3 rounded-lg shadow-xl">
+        <p className="font-bold text-sm mb-1">{String(label)}</p>
+        {payload.map((entry, index) => (
+          <p key={`item-${index}`} className="text-sm font-medium" style={{ color: entry.color }}>
+            {entry.name}: {String(entry.value)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+}
+
+interface GanttEntry {
+  agency: string;
+  timeRange: number[];
+  priority: string;
+  status: string;
+}
+
+function GanttTooltip({ active, payload }: TooltipProps<ValueType, NameType>) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload as GanttEntry;
+    return (
+      <div className="bg-popover border border-border/50 p-3 rounded-lg shadow-xl">
+        <p className="font-bold text-sm mb-2 text-foreground">{data.agency}</p>
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <p>Start: <span className="font-medium text-foreground">{format(new Date(data.timeRange[0]), 'MMM d, yyyy')}</span></p>
+          <p>End: <span className="font-medium text-foreground">{format(new Date(data.timeRange[1]), 'MMM d, yyyy')}</span></p>
+          <p>Priority: <span className="font-bold" style={{ color: PRIORITY_COLORS[data.priority] }}>{data.priority}</span></p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
 
 export default function Analytics() {
   const { data: timeData } = useGetAlertsOverTime({ days: 90 });
@@ -27,46 +69,14 @@ export default function Analytics() {
   const { data: agencyData } = useGetTopAgencies({ limit: 8 });
   const { data: timelineData } = useGetRebidTimeline();
 
-  // Format Gantt Data
-  const ganttData = (timelineData || []).filter(d => d.rebidWindowStart && d.rebidWindowEnd).map(d => ({
-    agency: d.agency.length > 20 ? d.agency.substring(0, 20) + '...' : d.agency,
-    timeRange: [new Date(d.rebidWindowStart!).getTime(), new Date(d.rebidWindowEnd!).getTime()],
-    priority: d.priority,
-    status: d.status
-  }));
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-popover border border-border/50 p-3 rounded-lg shadow-xl">
-          <p className="font-bold text-sm mb-1">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={`item-${index}`} className="text-sm font-medium" style={{ color: entry.color }}>
-              {entry.name}: {entry.value}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const GanttTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-popover border border-border/50 p-3 rounded-lg shadow-xl">
-          <p className="font-bold text-sm mb-2 text-foreground">{data.agency}</p>
-          <div className="space-y-1 text-sm text-muted-foreground">
-            <p>Start: <span className="font-medium text-foreground">{format(new Date(data.timeRange[0]), 'MMM d, yyyy')}</span></p>
-            <p>End: <span className="font-medium text-foreground">{format(new Date(data.timeRange[1]), 'MMM d, yyyy')}</span></p>
-            <p>Priority: <span className="font-bold" style={{ color: PRIORITY_COLORS[data.priority as keyof typeof PRIORITY_COLORS] }}>{data.priority}</span></p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+  const ganttData: GanttEntry[] = (timelineData || [])
+    .filter(d => d.rebidWindowStart && d.rebidWindowEnd)
+    .map(d => ({
+      agency: d.agency.length > 20 ? d.agency.substring(0, 20) + '...' : d.agency,
+      timeRange: [new Date(d.rebidWindowStart!).getTime(), new Date(d.rebidWindowEnd!).getTime()],
+      priority: d.priority,
+      status: d.status
+    }));
 
   return (
     <Layout>
@@ -78,7 +88,6 @@ export default function Analytics() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
-          {/* Line Chart: Alerts Over Time */}
           <Card className="border-border/50 shadow-md">
             <CardHeader>
               <CardTitle className="text-lg">Alert Volume (Last 90 Days)</CardTitle>
@@ -90,7 +99,7 @@ export default function Analytics() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis 
                       dataKey="date" 
-                      tickFormatter={(val) => format(new Date(val), 'MMM d')}
+                      tickFormatter={(val: string) => format(new Date(val), 'MMM d')}
                       tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                       axisLine={false}
                       tickLine={false}
@@ -117,7 +126,6 @@ export default function Analytics() {
             </CardContent>
           </Card>
 
-          {/* Pie Chart: Priority */}
           <Card className="border-border/50 shadow-md">
             <CardHeader>
               <CardTitle className="text-lg">Alert Distribution by Priority</CardTitle>
@@ -138,7 +146,7 @@ export default function Analytics() {
                       stroke="none"
                     >
                       {priorityData?.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.priority as keyof typeof PRIORITY_COLORS] || PRIORITY_COLORS.LOW} />
+                        <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.priority] ?? PRIORITY_COLORS.LOW} />
                       ))}
                     </Pie>
                     <Tooltip 
@@ -152,7 +160,6 @@ export default function Analytics() {
             </CardContent>
           </Card>
 
-          {/* Bar Chart: Agencies */}
           <Card className="border-border/50 shadow-md">
             <CardHeader>
               <CardTitle className="text-lg">Most Active Agencies</CardTitle>
@@ -179,7 +186,6 @@ export default function Analytics() {
             </CardContent>
           </Card>
 
-          {/* Gantt Chart: Rebid Timeline */}
           <Card className="border-border/50 shadow-md">
             <CardHeader>
               <CardTitle className="text-lg">Upcoming Rebid Windows</CardTitle>
@@ -191,8 +197,8 @@ export default function Analytics() {
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                     <XAxis 
                       type="number" 
-                      domain={['dataMin - 2592000000', 'dataMax + 2592000000']} // Add ~1 month padding
-                      tickFormatter={(val) => format(new Date(val), 'MMM yy')}
+                      domain={['dataMin - 2592000000', 'dataMax + 2592000000']}
+                      tickFormatter={(val: number) => format(new Date(val), 'MMM yy')}
                       tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       axisLine={false}
                       tickLine={false}
@@ -208,8 +214,8 @@ export default function Analytics() {
                     />
                     <Tooltip cursor={{ fill: 'hsl(var(--muted)/0.5)' }} content={<GanttTooltip />} />
                     <Bar dataKey="timeRange" radius={4} barSize={16}>
-                      {ganttData?.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.priority as keyof typeof PRIORITY_COLORS] || PRIORITY_COLORS.LOW} />
+                      {ganttData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.priority] ?? PRIORITY_COLORS.LOW} />
                       ))}
                     </Bar>
                   </BarChart>

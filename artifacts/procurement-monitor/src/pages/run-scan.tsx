@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
-import { useTriggerScan, useListScanLogs, useGetScanLog } from "@workspace/api-client-react";
+import { useTriggerScan, useListScanLogs, useGetScanLog, getGetScanLogQueryKey } from "@workspace/api-client-react";
 import { Play, Loader2, CheckCircle2, XCircle, Search, Clock, Database } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 
 export default function RunScan() {
   const [scanDays, setScanDays] = useState(30);
+  const [useKeywords, setUseKeywords] = useState(true);
+  const [useNaics, setUseNaics] = useState(true);
   const [activeScanId, setActiveScanId] = useState<number | null>(null);
   
   const { data: history, refetch: refetchHistory } = useListScanLogs({ limit: 5 });
@@ -21,30 +25,35 @@ export default function RunScan() {
     }
   });
 
-  // Poll active scan status
-  const { data: activeScan } = useGetScanLog(activeScanId || 0, {
+  const [isPolling, setIsPolling] = useState(false);
+
+  // Fetch active scan status
+  const { data: activeScan, refetch: refetchActiveScan } = useGetScanLog(activeScanId || 0, {
     query: {
+      queryKey: getGetScanLogQueryKey(activeScanId || 0),
       enabled: !!activeScanId,
-      refetchInterval: (query) => {
-        const status = query.state.data?.status;
-        return (status === 'running' || !status) ? 2000 : false;
-      }
     }
   });
 
-  // Clear active scan when it finishes
+  // Poll using setInterval when scan is running
   useEffect(() => {
+    if (!activeScanId) return;
     if (activeScan?.status === 'completed' || activeScan?.status === 'failed') {
+      setIsPolling(false);
       refetchHistory();
+      return;
     }
-  }, [activeScan?.status, refetchHistory]);
+    setIsPolling(true);
+    const timer = setInterval(() => { void refetchActiveScan(); }, 2000);
+    return () => clearInterval(timer);
+  }, [activeScanId, activeScan?.status, refetchActiveScan, refetchHistory]);
 
   const handleStart = () => {
     triggerMutation.mutate({
       data: {
         scanWindowDays: scanDays,
-        useKeywords: true,
-        useNaics: true
+        useKeywords,
+        useNaics,
       }
     });
   };
@@ -83,11 +92,26 @@ export default function RunScan() {
                 <p className="text-xs text-muted-foreground">Look back period for SAM.gov notices.</p>
               </div>
 
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-foreground">Search Strategies</p>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="use-keywords" className="text-sm text-muted-foreground cursor-pointer">Keyword search</Label>
+                  <Switch id="use-keywords" checked={useKeywords} onCheckedChange={setUseKeywords} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="use-naics" className="text-sm text-muted-foreground cursor-pointer">NAICS code search</Label>
+                  <Switch id="use-naics" checked={useNaics} onCheckedChange={setUseNaics} />
+                </div>
+                {!useKeywords && !useNaics && (
+                  <p className="text-xs text-destructive">At least one strategy must be enabled.</p>
+                )}
+              </div>
+
               <div className="pt-4 border-t border-border/50">
-                <Button 
+                <Button
                   className="w-full h-12 text-base font-bold shadow-lg shadow-primary/25 hover:-translate-y-0.5 transition-all"
                   onClick={handleStart}
-                  disabled={isRunning}
+                  disabled={isRunning || (!useKeywords && !useNaics)}
                 >
                   {isRunning ? (
                     <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Engine Running...</>

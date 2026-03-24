@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { initScheduler } from "./services/scheduler";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,8 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  initScheduler().catch((schedErr) => {
+    logger.error({ err: schedErr }, "Failed to start scheduler");
+  });
 });

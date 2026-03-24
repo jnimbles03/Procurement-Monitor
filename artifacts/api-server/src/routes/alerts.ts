@@ -1,11 +1,11 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { alertsTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, count, desc } from "drizzle-orm";
 
 const router = Router();
 
-router.get("/alerts/stats", async (req, res) => {
+router.get("/alerts/stats", async (req: Request, res: Response): Promise<void> => {
   try {
     const [stats] = await db
       .select({
@@ -38,7 +38,7 @@ router.get("/alerts/stats", async (req, res) => {
   }
 });
 
-router.get("/alerts", async (req, res) => {
+router.get("/alerts", async (req: Request, res: Response): Promise<void> => {
   try {
     const { priority, agencyMatchId, minMatchScore, dateFrom, dateTo, limit = "200", offset = "0" } = req.query;
 
@@ -71,11 +71,14 @@ router.get("/alerts", async (req, res) => {
   }
 });
 
-router.delete("/alerts/:id", async (req, res) => {
+router.delete("/alerts/:id", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     const [deleted] = await db.delete(alertsTable).where(eq(alertsTable.id, id)).returning();
-    if (!deleted) return res.status(404).json({ error: "Not found" });
+    if (!deleted) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete alert");

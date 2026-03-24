@@ -1,11 +1,11 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { alertsTable, watchlistEntriesTable } from "@workspace/db";
-import { sql, desc } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 const router = Router();
 
-router.get("/analytics/alerts-over-time", async (req, res) => {
+router.get("/analytics/alerts-over-time", async (req: Request, res: Response): Promise<void> => {
   try {
     const days = parseInt(String(req.query.days ?? "90"), 10);
     const result = await db.execute(sql`
@@ -24,7 +24,7 @@ router.get("/analytics/alerts-over-time", async (req, res) => {
   }
 });
 
-router.get("/analytics/alerts-by-priority", async (req, res) => {
+router.get("/analytics/alerts-by-priority", async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await db.execute(sql`
       SELECT 
@@ -41,7 +41,7 @@ router.get("/analytics/alerts-by-priority", async (req, res) => {
   }
 });
 
-router.get("/analytics/top-agencies", async (req, res) => {
+router.get("/analytics/top-agencies", async (req: Request, res: Response): Promise<void> => {
   try {
     const limit = parseInt(String(req.query.limit ?? "10"), 10);
     const result = await db.execute(sql`
@@ -60,7 +60,7 @@ router.get("/analytics/top-agencies", async (req, res) => {
   }
 });
 
-router.get("/analytics/rebid-timeline", async (req, res) => {
+router.get("/analytics/rebid-timeline", async (req: Request, res: Response): Promise<void> => {
   try {
     const entries = await db
       .select()

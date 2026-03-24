@@ -1,7 +1,8 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { configTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { initScheduler } from "../services/scheduler";
 
 const router = Router();
 
@@ -36,7 +37,7 @@ async function setConfig(key: string, value: string): Promise<void> {
     .onConflictDoUpdate({ target: configTable.key, set: { value, updatedAt: new Date() } });
 }
 
-router.get("/config", async (req, res) => {
+router.get("/config", async (req: Request, res: Response): Promise<void> => {
   try {
     const config = await getConfigMap();
     res.json({
@@ -59,7 +60,7 @@ router.get("/config", async (req, res) => {
   }
 });
 
-router.put("/config", async (req, res) => {
+router.put("/config", async (req: Request, res: Response): Promise<void> => {
   try {
     const body = req.body;
 
@@ -76,6 +77,10 @@ router.put("/config", async (req, res) => {
       setConfig("email_sender_email", body.emailSenderEmail ?? ""),
       setConfig("email_recipients", JSON.stringify(body.emailRecipients ?? [])),
     ]);
+
+    initScheduler().catch((schedErr) => {
+      req.log.error({ err: schedErr }, "Failed to reinitialize scheduler after config update");
+    });
 
     const configMap = await getConfigMap();
     res.json({

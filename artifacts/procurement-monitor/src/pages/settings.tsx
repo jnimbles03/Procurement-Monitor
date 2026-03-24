@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Key, Mail, Search, Clock, ShieldCheck, AlertCircle } from "lucide-react";
+import { Save, Key, Mail, Search, Clock, ShieldCheck, AlertCircle, Target } from "lucide-react";
 
 export default function Settings() {
   const { data: config, isLoading } = useGetConfig();
@@ -196,5 +196,4 @@ export default function Settings() {
   );
 }
 
-// Temporary import fix for Target
-import { Target } from "lucide-react";
+
