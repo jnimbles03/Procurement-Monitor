@@ -1,0 +1,53 @@
+{
+  "sam_api_key": "SAM-29db880b-64f6-496f-85c9-929bbc01401f",
+  "email_notifications": {
+    "enabled": false,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "sender_email": "",
+    "sender_password": "",
+    "recipients": []
+  },
+  "scan_window_days": 30,
+  "match_threshold": 0.4,
+  "naics_codes": [
+    "541511",
+    "541512",
+    "511210",
+    "518210",
+    "541519"
+  ],
+  "search_keywords": [
+    "electronic signature",
+    "esignature",
+    "e-signature",
+    "digital signature",
+    "contract lifecycle management",
+    "contract management",
+    "CLM",
+    "document management",
+    "DocuSign",
+    "Adobe Sign"
+  ],
+  "state_portals": {
+    "FL": "https://vendor.myfloridamarketplace.com",
+    "OH": "https://procure.ohio.gov/proc/searchArchive.asp",
+    "TX": "https://www.txsmartbuy.com",
+    "CA": "https://caleprocure.ca.gov/pages/public-search.aspx",
+    "PA": "https://www.emarketplace.state.pa.us",
+    "MN": "https://mn.gov/admin/government/procurement-bids/",
+    "IL": "https://www.bidbuy.illinois.gov",
+    "MD": "https://emaryland.buyspeed.com",
+    "GA": "https://ssl.doas.state.ga.us/PRSapp/PR_index.jsp",
+    "NM": "https://www.generalservices.state.nm.us",
+    "SD": "https://bids.sd.gov",
+    "NC": "https://www.ips.state.nc.us",
+    "NJ": "https://www.njstart.gov",
+    "OK": "https://oklahoma.gov/omes/services/purchasing.html",
+    "NV": "https://purchasing.nv.gov",
+    "CT": "https://biznet.ct.gov/SCP_Search/Default.aspx",
+    "MS": "https://www.contractsearch.ms.gov",
+    "WY": "https://ai.wyo.gov/divisions/general-services/procurement",
+    "PR": "https://www.asg.pr.gov"
+  }
+}
