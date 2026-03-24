@@ -216,6 +216,48 @@ export interface FederalExpiryEntry {
   daysToExpiry?: number | null;
 }
 
+export type WinBackEntryPriority =
+  (typeof WinBackEntryPriority)[keyof typeof WinBackEntryPriority];
+
+export const WinBackEntryPriority = {
+  HIGH: "HIGH",
+  MEDIUM: "MEDIUM",
+  WATCH: "WATCH",
+  LOW: "LOW",
+} as const;
+
+export type WinBackEntryStatus =
+  (typeof WinBackEntryStatus)[keyof typeof WinBackEntryStatus];
+
+export const WinBackEntryStatus = {
+  ACT_NOW: "ACT_NOW",
+  IMMINENT: "IMMINENT",
+  PREPARE: "PREPARE",
+  PLAN: "PLAN",
+  EXPIRED: "EXPIRED",
+} as const;
+
+export interface WinBackEntry {
+  id: number;
+  agency: string;
+  priority: WinBackEntryPriority;
+  tcv: number;
+  competitor: string;
+  state: string;
+  rebidWindowStart?: string | null;
+  rebidWindowEnd?: string | null;
+  daysToOpen?: number | null;
+  daysToClose?: number | null;
+  alertCount: number;
+  bestMatchScore?: number | null;
+  hasUsaSpendingIntel: boolean;
+  usaSpendingContractEnd?: string | null;
+  winBackScore: number;
+  status: WinBackEntryStatus;
+  urgencyLabel: string;
+  actionHint: string;
+}
+
 export type ListAlertsParams = {
   priority?: string;
   agencyMatchId?: number;

@@ -33,3 +33,6 @@ export * from "./tcvByPriorityPoint";
 export * from "./topAgencyPoint";
 export * from "./watchlistEntry";
 export * from "./watchlistEntryPriority";
+export * from "./winBackEntry";
+export * from "./winBackEntryPriority";
+export * from "./winBackEntryStatus";

@@ -434,3 +434,30 @@ export const GetFederalExpiryResponseItem = zod.object({
   daysToExpiry: zod.number().nullish(),
 });
 export const GetFederalExpiryResponse = zod.array(GetFederalExpiryResponseItem);
+
+/**
+ * @summary Get all watchlist accounts ranked by win-back composite score
+ */
+export const GetWinBackReadinessResponseItem = zod.object({
+  id: zod.number(),
+  agency: zod.string(),
+  priority: zod.enum(["HIGH", "MEDIUM", "WATCH", "LOW"]),
+  tcv: zod.number(),
+  competitor: zod.string(),
+  state: zod.string(),
+  rebidWindowStart: zod.string().nullish(),
+  rebidWindowEnd: zod.string().nullish(),
+  daysToOpen: zod.number().nullish(),
+  daysToClose: zod.number().nullish(),
+  alertCount: zod.number(),
+  bestMatchScore: zod.number().nullish(),
+  hasUsaSpendingIntel: zod.boolean(),
+  usaSpendingContractEnd: zod.string().nullish(),
+  winBackScore: zod.number(),
+  status: zod.enum(["ACT_NOW", "IMMINENT", "PREPARE", "PLAN", "EXPIRED"]),
+  urgencyLabel: zod.string(),
+  actionHint: zod.string(),
+});
+export const GetWinBackReadinessResponse = zod.array(
+  GetWinBackReadinessResponseItem,
+);

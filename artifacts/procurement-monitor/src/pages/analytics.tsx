@@ -1,26 +1,20 @@
 import { Layout } from "@/components/layout";
 import {
-  useGetAlertsOverTime,
-  useGetAlertsByPriority,
-  useGetTopAgencies,
-  useGetRebidTimeline,
-  useGetPipelineKpis,
-  useGetTcvByPriority,
+  useGetWinBackReadiness,
   useGetCompetitorBreakdown,
   useGetMatchScoreDistribution,
-  useGetFederalExpiry,
+  useGetTcvByPriority,
 } from "@workspace/api-client-react";
+import type { WinBackEntry } from "@workspace/api-client-react";
 import {
-  LineChart, Line,
-  BarChart, Bar,
-  PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import type { TooltipProps } from "recharts";
-import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
-import { format, differenceInDays } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, AlertTriangle, Target, Calendar, Building2, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Target, Zap, AlertTriangle, TrendingUp, Users, Brain, Clock, CheckCircle2,
+} from "lucide-react";
 
 const PRIORITY_COLORS: Record<string, string> = {
   HIGH: "hsl(0, 84%, 60%)",
@@ -29,570 +23,372 @@ const PRIORITY_COLORS: Record<string, string> = {
   LOW: "hsl(215, 16%, 47%)",
 };
 
-const PRIORITY_BG: Record<string, string> = {
-  HIGH: "bg-red-500/10 text-red-600 border-red-500/20",
-  MEDIUM: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  WATCH: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  LOW: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  ACT_NOW: { label: "ACT NOW", bg: "bg-red-950", text: "text-red-300", border: "border-red-700" },
+  IMMINENT: { label: "IMMINENT", bg: "bg-amber-950", text: "text-amber-300", border: "border-amber-700" },
+  PREPARE: { label: "PREPARE", bg: "bg-blue-950", text: "text-blue-300", border: "border-blue-700" },
+  PLAN: { label: "PLAN", bg: "bg-slate-800", text: "text-slate-300", border: "border-slate-600" },
+  EXPIRED: { label: "EXPIRED", bg: "bg-slate-900", text: "text-slate-500", border: "border-slate-700" },
 };
 
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${Math.round(n).toLocaleString()}`;
-}
+const COMPETITOR_PLAYBOOK: Record<string, { weakness: string; angle: string }> = {
+  Adobe: {
+    weakness: "High licensing cost, limited e-signature workflow depth",
+    angle: "Lead with DocuSign CLM integration + compliance automation — Adobe lacks native contract lifecycle.",
+  },
+  IronClad: {
+    weakness: "Contract-focused, weak on forms & citizen-facing workflows",
+    angle: "Emphasize DocuSign Forms + government identity verification. IronClad has no public-sector UX story.",
+  },
+  "Madison Cloud": {
+    weakness: "Niche federal integrator, limited commercial-grade scale",
+    angle: "Highlight FedRAMP authorization + ATO track record at scale. Madison Cloud can't match enterprise SLA.",
+  },
+  Nintex: {
+    weakness: "Workflow automation-first, e-signature is a bolt-on",
+    angle: "Lead with eSign reliability and audit trail — Nintex customers report signature failures in compliance audits.",
+  },
+  Authorium: {
+    weakness: "State/local grant-writing focus, narrow use-case",
+    angle: "Show breadth: DocuSign handles grants AND contracts AND permits — Authorium locks agencies into one workflow.",
+  },
+  DocaPost: {
+    weakness: "European vendor, limited US FedRAMP presence",
+    angle: "FedRAMP + US data residency is a hard requirement. Emphasize FEDRAMP High impact level.",
+  },
+  "Global Solutions Group": {
+    weakness: "Regional SI, limited product investment",
+    angle: "DocuSign's product roadmap and Salesforce/ServiceNow integrations far outpace a reseller's offering.",
+  },
+};
 
-function PriorityBadge({ priority }: { priority: string }) {
+const fmt = (n: number) =>
+  n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`;
+
+function ScoreBadge({ score }: { score: number }) {
+  const color =
+    score >= 70 ? "bg-red-600" : score >= 55 ? "bg-amber-600" : score >= 40 ? "bg-blue-600" : "bg-slate-600";
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${PRIORITY_BG[priority] ?? PRIORITY_BG.LOW}`}>
-      {priority}
+    <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full ${color} text-white text-sm font-bold`}>
+      {score}
     </span>
   );
 }
 
-function ChartTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
-  if (!active || !payload?.length) return null;
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.PLAN;
   return (
-    <div className="bg-popover border border-border/50 px-3 py-2 rounded-lg shadow-xl text-sm">
-      {label && <p className="font-semibold mb-1 text-foreground">{String(label)}</p>}
-      {payload.map((entry, i) => (
-        <p key={i} className="font-medium" style={{ color: entry.color }}>
-          {entry.name}: {typeof entry.value === "number" && entry.name?.toString().includes("$")
-            ? formatCurrency(entry.value)
-            : String(entry.value)}
-        </p>
-      ))}
-    </div>
+    <span className={`inline-block px-2 py-0.5 rounded border text-xs font-bold ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+      {cfg.label}
+    </span>
   );
 }
 
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  color = "text-primary",
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  sub?: string;
-  color?: string;
-}) {
+function AlertSignal({ count, score }: { count: number; score: number | null }) {
+  if (count === 0) return <span className="text-slate-500 text-xs">No signals</span>;
+  const pct = score != null ? Math.round(score * 100) : 0;
+  const color = pct >= 80 ? "text-emerald-400" : pct >= 50 ? "text-amber-400" : "text-slate-400";
   return (
-    <Card className="border-border/50 shadow-sm">
-      <CardContent className="pt-5 pb-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
-            <p className="text-2xl font-bold text-foreground">{value}</p>
-            {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-          </div>
-          <div className={`p-2.5 rounded-xl bg-muted/60 ${color}`}>
-            <Icon className="w-5 h-5" />
-          </div>
+    <span className={`text-xs font-medium ${color}`}>
+      {count} signal{count > 1 ? "s" : ""} · {pct}% match
+    </span>
+  );
+}
+
+function PriorityDot({ priority }: { priority: string }) {
+  return (
+    <span
+      className="inline-block w-2 h-2 rounded-full mr-1.5 flex-shrink-0"
+      style={{ backgroundColor: PRIORITY_COLORS[priority] ?? "#6b7280" }}
+    />
+  );
+}
+
+function WinBackRow({ entry, rank }: { entry: WinBackEntry; rank: number }) {
+  return (
+    <tr className={`border-b border-slate-800 hover:bg-slate-800/50 ${entry.status === "EXPIRED" ? "opacity-50" : ""}`}>
+      <td className="px-4 py-3 text-slate-500 text-sm w-8">{rank}</td>
+      <td className="px-4 py-3 w-10">
+        <ScoreBadge score={entry.winBackScore} />
+      </td>
+      <td className="px-4 py-3">
+        <StatusBadge status={entry.status} />
+      </td>
+      <td className="px-4 py-3 min-w-[200px]">
+        <div className="flex items-center text-sm font-medium text-slate-100">
+          <PriorityDot priority={entry.priority} />
+          {entry.agency}
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-interface GanttEntry {
-  agency: string;
-  timeRange: number[];
-  priority: string;
-  status: string;
-}
-
-function GanttTooltip({ active, payload }: TooltipProps<ValueType, NameType>) {
-  if (!active || !payload?.length) return null;
-  const data = payload[0].payload as GanttEntry;
-  return (
-    <div className="bg-popover border border-border/50 p-3 rounded-lg shadow-xl">
-      <p className="font-bold text-sm mb-1 text-foreground">{data.agency}</p>
-      <p className="text-xs text-muted-foreground">
-        {format(new Date(data.timeRange[0]), "MMM d, yyyy")} — {format(new Date(data.timeRange[1]), "MMM d, yyyy")}
-      </p>
-      <p className="text-xs mt-1">
-        Priority: <span className="font-bold" style={{ color: PRIORITY_COLORS[data.priority] }}>{data.priority}</span>
-      </p>
-    </div>
+        <div className="text-xs text-slate-500 mt-0.5 ml-3.5">{entry.state}</div>
+      </td>
+      <td className="px-4 py-3 text-sm font-mono text-slate-200">{fmt(entry.tcv)}</td>
+      <td className="px-4 py-3 text-sm text-slate-300">{entry.competitor || "—"}</td>
+      <td className="px-4 py-3 text-xs text-slate-400">{entry.urgencyLabel}</td>
+      <td className="px-4 py-3">
+        <AlertSignal count={entry.alertCount} score={entry.bestMatchScore ?? null} />
+      </td>
+      <td className="px-4 py-3 text-xs text-slate-400 max-w-[280px]">{entry.actionHint}</td>
+    </tr>
   );
 }
 
 export default function Analytics() {
-  const { data: kpis } = useGetPipelineKpis();
-  const { data: timeData } = useGetAlertsOverTime({ days: 90 });
-  const { data: priorityData } = useGetAlertsByPriority();
-  const { data: agencyData } = useGetTopAgencies({ limit: 8 });
-  const { data: timelineData } = useGetRebidTimeline();
-  const { data: tcvByPriority } = useGetTcvByPriority();
-  const { data: competitors } = useGetCompetitorBreakdown();
-  const { data: scoreDistribution } = useGetMatchScoreDistribution();
-  const { data: federalExpiry } = useGetFederalExpiry();
+  const { data: winBack = [], isLoading: wbLoading } = useGetWinBackReadiness();
+  const { data: competitors = [] } = useGetCompetitorBreakdown();
+  const { data: scoreDistribution = [] } = useGetMatchScoreDistribution();
+  const { data: tcvByPriority = [] } = useGetTcvByPriority();
 
-  const ganttData: GanttEntry[] = (timelineData ?? [])
-    .filter((d) => d.rebidWindowStart && d.rebidWindowEnd)
-    .map((d) => ({
-      agency: d.agency.length > 22 ? d.agency.substring(0, 22) + "…" : d.agency,
-      timeRange: [new Date(d.rebidWindowStart!).getTime(), new Date(d.rebidWindowEnd!).getTime()],
-      priority: d.priority,
-      status: d.status,
-    }));
+  const actNow = winBack.filter((e) => e.status === "ACT_NOW");
+  const imminent = winBack.filter((e) => e.status === "IMMINENT");
+  const withAlerts = winBack.filter((e) => e.alertCount > 0);
+  const totalTcv = winBack.filter((e) => e.status !== "EXPIRED").reduce((s, e) => s + e.tcv, 0);
+  const topEntry = winBack[0];
 
-  const avgScore = kpis ? Math.round(kpis.avgMatchScore * 100) : 0;
-  const nextRebidLabel = kpis?.nextRebidDays != null
-    ? kpis.nextRebidDays <= 0 ? "Active now" : `${kpis.nextRebidDays}d away`
-    : "—";
-
-  const competitorFiltered = (competitors ?? []).filter(
-    (c) => !["N/A", "Unknown", "Will Not Disclose"].includes(c.competitor)
-  );
+  const competitorChartData = competitors
+    .filter((c) => !["N/A", "Will Not Disclose", "Unknown"].includes(c.competitor))
+    .map((c) => ({ ...c, totalTcv: Math.round(c.totalTcv / 1000) }));
 
   return (
     <Layout>
-      <div className="p-8 space-y-7 animate-in fade-in duration-700">
+      <div className="p-6 space-y-6">
+        {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold">Analytics & Intelligence</h1>
-          <p className="text-muted-foreground mt-1">Macro trends, pipeline value, and competitive intelligence.</p>
+          <h1 className="text-2xl font-bold text-slate-100">Win-Back Intelligence</h1>
+          <p className="text-slate-400 mt-1">
+            Patterns from 21 lost deals — ranked by rebound opportunity and procurement signal strength
+          </p>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <KpiCard
-            icon={TrendingUp}
-            label="Pipeline TCV"
-            value={kpis ? formatCurrency(kpis.totalTcv) : "—"}
-            sub={`${kpis?.watchlistCount ?? 0} accounts`}
-            color="text-primary"
-          />
-          <KpiCard
-            icon={Target}
-            label="Total Alerts"
-            value={kpis ? String(kpis.totalAlerts) : "—"}
-            sub="matched opportunities"
-            color="text-blue-500"
-          />
-          <KpiCard
-            icon={AlertTriangle}
-            label="HIGH Priority"
-            value={kpis ? String(kpis.highPriorityAlerts) : "—"}
-            sub="alerts this scan"
-            color="text-red-500"
-          />
-          <KpiCard
-            icon={Building2}
-            label="Avg Match Score"
-            value={kpis ? `${avgScore}%` : "—"}
-            sub="across all alerts"
-            color="text-amber-500"
-          />
-          <KpiCard
-            icon={Calendar}
-            label="Next Rebid Window"
-            value={nextRebidLabel}
-            sub={`${kpis?.activeRebidCount ?? 0} windows open`}
-            color="text-green-500"
-          />
-        </div>
-
-        {/* Row 1: Alert Volume + TCV by Priority */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <Card className="border-border/50 shadow-md lg:col-span-3">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Alert Volume — Last 90 Days</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={timeData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={(val: string) => format(new Date(val + "T00:00:00"), "MMM d")}
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      axisLine={false} tickLine={false} dy={8}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      axisLine={false} tickLine={false} allowDecimals={false}
-                    />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Line
-                      type="monotone" dataKey="count" name="Alerts"
-                      stroke="hsl(var(--primary))" strokeWidth={2.5}
-                      dot={{ r: 4, fill: "hsl(var(--primary))", stroke: "white", strokeWidth: 2 }}
-                      activeDot={{ r: 6, fill: "hsl(var(--primary))", stroke: "white", strokeWidth: 2 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+        {/* KPI Strip */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="bg-slate-900 border-slate-800">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="w-4 h-4 text-red-400" />
+                <span className="text-xs text-slate-400 uppercase tracking-wide">Windows Open Now</span>
               </div>
+              <div className="text-3xl font-bold text-red-400">{actNow.length}</div>
+              <div className="text-xs text-slate-500 mt-1">accounts in active rebid window</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-900 border-slate-800">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span className="text-xs text-slate-400 uppercase tracking-wide">Opening &lt;90 Days</span>
+              </div>
+              <div className="text-3xl font-bold text-amber-400">{imminent.length}</div>
+              <div className="text-xs text-slate-500 mt-1">windows opening imminently</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-900 border-slate-800">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Brain className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs text-slate-400 uppercase tracking-wide">Active Signals</span>
+              </div>
+              <div className="text-3xl font-bold text-emerald-400">{withAlerts.length}</div>
+              <div className="text-xs text-slate-500 mt-1">accounts with SAM.gov procurement signals</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-900 border-slate-800">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="w-4 h-4 text-blue-400" />
+                <span className="text-xs text-slate-400 uppercase tracking-wide">Pipeline at Stake</span>
+              </div>
+              <div className="text-3xl font-bold text-blue-400">{fmt(totalTcv)}</div>
+              <div className="text-xs text-slate-500 mt-1">total TCV across open windows</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Win-Back Scoreboard */}
+        <Card className="bg-slate-900 border-slate-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-slate-100 flex items-center gap-2">
+              <Target className="w-5 h-5 text-red-400" />
+              Win-Back Scoreboard
+              <span className="text-sm font-normal text-slate-400 ml-2">
+                — all 21 accounts ranked by composite opportunity score
+              </span>
+            </CardTitle>
+            <p className="text-xs text-slate-500 mt-1">
+              Score combines: Urgency (40 pts) + Procurement Signal (30 pts) + Federal Intel (20 pts) + Deal Value (10 pts)
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            {wbLoading ? (
+              <div className="p-8 text-center text-slate-500">Loading win-back data…</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left">#</th>
+                      <th className="px-4 py-2 text-left">Score</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left">Account</th>
+                      <th className="px-4 py-2 text-left">TCV</th>
+                      <th className="px-4 py-2 text-left">Incumbent</th>
+                      <th className="px-4 py-2 text-left">Rebid Window</th>
+                      <th className="px-4 py-2 text-left">SAM.gov Signals</th>
+                      <th className="px-4 py-2 text-left">Recommended Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {winBack.map((entry, i) => (
+                      <WinBackRow key={entry.id} entry={entry} rank={i + 1} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Bottom row: Competitive Playbook + Charts */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Competitive Playbook */}
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-slate-100 flex items-center gap-2">
+                <Users className="w-5 h-5 text-violet-400" />
+                Competitive Displacement Playbook
+              </CardTitle>
+              <p className="text-xs text-slate-500">How to unseat each incumbent — based on deal loss patterns</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {competitorChartData.map((c) => {
+                const pb = COMPETITOR_PLAYBOOK[c.competitor];
+                return (
+                  <div key={c.competitor} className="rounded-lg border border-slate-700 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-100">{c.competitor}</span>
+                      <div className="flex gap-3 text-xs text-slate-400">
+                        <span>{c.count} deal{c.count > 1 ? "s" : ""} lost</span>
+                        <span className="font-mono text-slate-300">{fmt(c.totalTcv * 1000)}</span>
+                      </div>
+                    </div>
+                    {pb ? (
+                      <>
+                        <div className="text-xs text-amber-400">
+                          <span className="font-semibold">Their weakness:</span> {pb.weakness}
+                        </div>
+                        <div className="text-xs text-emerald-400">
+                          <span className="font-semibold">Your angle:</span> {pb.angle}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-slate-500">Build competitive intelligence from deal notes.</div>
+                    )}
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 shadow-md lg:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Pipeline TCV by Priority</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={tcvByPriority} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                    <XAxis
-                      dataKey="priority"
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      axisLine={false} tickLine={false}
-                    />
-                    <YAxis
-                      tickFormatter={(v: number) => formatCurrency(v)}
-                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      axisLine={false} tickLine={false} width={52}
-                    />
+          {/* Right column: two charts stacked */}
+          <div className="space-y-6">
+            {/* TCV at risk per competitor */}
+            <Card className="bg-slate-900 border-slate-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-slate-100 flex items-center gap-2 text-base">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  TCV at Risk by Incumbent
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart
+                    data={competitorChartData}
+                    layout="vertical"
+                    margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
+                  >
+                    <CartesianGrid horizontal={false} stroke="#334155" />
+                    <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `$${v}K`} />
+                    <YAxis type="category" dataKey="competitor" tick={{ fill: "#94a3b8", fontSize: 11 }} width={100} />
                     <Tooltip
-                      content={(props) => {
-                        if (!props.active || !props.payload?.length) return null;
-                        const p = props.payload[0];
-                        return (
-                          <div className="bg-popover border border-border/50 px-3 py-2 rounded-lg shadow-xl text-sm">
-                            <p className="font-semibold text-foreground mb-1">{String(props.label)} Priority</p>
-                            <p style={{ color: PRIORITY_COLORS[String(props.label)] ?? PRIORITY_COLORS.LOW }}>
-                              {formatCurrency(Number(p.value))}
-                            </p>
-                          </div>
-                        );
-                      }}
+                      contentStyle={{ background: "#1e293b", border: "1px solid #334155", color: "#f1f5f9" }}
+                      formatter={(v: number) => [`$${v}K`, "TCV at risk"]}
                     />
-                    <Bar dataKey="tcv" name="TCV" radius={[4, 4, 0, 0]} maxBarSize={48}>
-                      {(tcvByPriority ?? []).map((entry, i) => (
-                        <Cell key={i} fill={PRIORITY_COLORS[entry.priority] ?? PRIORITY_COLORS.LOW} />
+                    <Bar dataKey="totalTcv" radius={[0, 4, 4, 0]}>
+                      {competitorChartData.map((_, i) => (
+                        <Cell key={i} fill={["hsl(0,84%,60%)", "hsl(38,92%,50%)", "hsl(221,83%,53%)", "hsl(271,81%,56%)", "hsl(160,84%,39%)", "hsl(199,89%,48%)"][i % 6]} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
 
-        {/* Row 2: Priority Donut + Competitor Intelligence */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border-border/50 shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Alert Distribution by Priority</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-6">
-                <div className="h-[200px] w-[200px] shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={priorityData} cx="50%" cy="50%"
-                        innerRadius={60} outerRadius={85}
-                        paddingAngle={4} dataKey="count" nameKey="priority" stroke="none"
-                      >
-                        {(priorityData ?? []).map((entry, i) => (
-                          <Cell key={i} fill={PRIORITY_COLORS[entry.priority] ?? PRIORITY_COLORS.LOW} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={(props) => {
-                          if (!props.active || !props.payload?.length) return null;
-                          const p = props.payload[0];
-                          return (
-                            <div className="bg-popover border border-border/50 px-3 py-2 rounded-lg shadow-xl text-sm">
-                              <p style={{ color: PRIORITY_COLORS[String(p.name)] ?? PRIORITY_COLORS.LOW }} className="font-bold">
-                                {String(p.name)}
-                              </p>
-                              <p className="text-foreground">{String(p.value)} alerts</p>
-                            </div>
-                          );
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex flex-col gap-3 flex-1">
-                  {(priorityData ?? []).map((entry) => {
-                    const total = (priorityData ?? []).reduce((s, e) => s + e.count, 0);
-                    const pct = total > 0 ? Math.round((entry.count / total) * 100) : 0;
+            {/* Match score distribution — signal quality */}
+            <Card className="bg-slate-900 border-slate-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-slate-100 flex items-center gap-2 text-base">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Alert Signal Quality
+                </CardTitle>
+                <p className="text-xs text-slate-500">Match score distribution across {scoreDistribution.reduce((s, d) => s + d.count, 0)} SAM.gov alerts</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {scoreDistribution.map((bucket) => {
+                    const total = scoreDistribution.reduce((s, d) => s + d.count, 0);
+                    const pct = total > 0 ? Math.round((bucket.count / total) * 100) : 0;
+                    const color =
+                      bucket.minScore >= 90 ? "bg-emerald-500" :
+                      bucket.minScore >= 70 ? "bg-blue-500" :
+                      bucket.minScore >= 50 ? "bg-amber-500" :
+                      bucket.minScore >= 30 ? "bg-orange-600" : "bg-slate-600";
                     return (
-                      <div key={entry.priority} className="flex items-center gap-3">
-                        <div
-                          className="w-3 h-3 rounded-full shrink-0"
-                          style={{ background: PRIORITY_COLORS[entry.priority] ?? PRIORITY_COLORS.LOW }}
-                        />
-                        <div className="flex-1">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium text-foreground">{entry.priority}</span>
-                            <span className="text-muted-foreground">{entry.count} ({pct}%)</span>
-                          </div>
-                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${pct}%`,
-                                background: PRIORITY_COLORS[entry.priority] ?? PRIORITY_COLORS.LOW,
-                              }}
-                            />
-                          </div>
+                      <div key={bucket.range} className="flex items-center gap-3">
+                        <span className="text-xs text-slate-400 w-16 text-right">{bucket.range}</span>
+                        <div className="flex-1 bg-slate-800 rounded h-5 overflow-hidden">
+                          <div className={`h-full ${color} rounded`} style={{ width: `${pct}%` }} />
                         </div>
+                        <span className="text-xs text-slate-300 w-16">
+                          {bucket.count} alert{bucket.count !== 1 ? "s" : ""} ({pct}%)
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <p className="text-xs text-slate-500 mt-3">
+                  Higher match scores indicate stronger procurement signal alignment with your deal history.
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card className="border-border/50 shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Competitor Intelligence</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Deals lost by incumbent vendor — sorted by TCV at risk</p>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={competitorFiltered}
-                    layout="vertical"
-                    margin={{ top: 0, right: 60, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                    <XAxis type="number" hide />
-                    <YAxis
-                      dataKey="competitor" type="category"
-                      axisLine={false} tickLine={false}
-                      tick={{ fontSize: 11, fill: "hsl(var(--foreground))", fontWeight: 500 }}
-                      width={90}
-                    />
+            {/* TCV by priority */}
+            <Card className="bg-slate-900 border-slate-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-slate-100 flex items-center gap-2 text-base">
+                  <TrendingUp className="w-4 h-4 text-blue-400" />
+                  Lost Deal Value by Priority Tier
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart data={tcvByPriority} margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+                    <CartesianGrid vertical={false} stroke="#334155" />
+                    <XAxis dataKey="priority" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} />
                     <Tooltip
-                      content={(props) => {
-                        if (!props.active || !props.payload?.length) return null;
-                        const p = props.payload[0].payload as { competitor: string; count: number; totalTcv: number };
-                        return (
-                          <div className="bg-popover border border-border/50 px-3 py-2 rounded-lg shadow-xl text-sm">
-                            <p className="font-semibold text-foreground mb-1">{p.competitor}</p>
-                            <p className="text-primary">{formatCurrency(p.totalTcv)} TCV</p>
-                            <p className="text-muted-foreground">{p.count} deal{p.count !== 1 ? "s" : ""} lost</p>
-                          </div>
-                        );
-                      }}
+                      contentStyle={{ background: "#1e293b", border: "1px solid #334155", color: "#f1f5f9" }}
+                      formatter={(v: number) => [fmt(v), "TCV"]}
                     />
-                    <Bar dataKey="totalTcv" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20}>
-                      {competitorFiltered.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={`hsl(var(--primary) / ${Math.max(0.4, 1 - i * 0.12)})`}
-                        />
+                    <Bar dataKey="tcv" radius={[4, 4, 0, 0]}>
+                      {tcvByPriority.map((d) => (
+                        <Cell key={d.priority} fill={PRIORITY_COLORS[d.priority] ?? "#6b7280"} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-
-        {/* Row 3: Match Score Distribution */}
-        <Card className="border-border/50 shadow-md">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Match Score Distribution</CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">How closely each SAM.gov alert matches your watchlist criteria</p>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[140px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={scoreDistribution}
-                  layout="vertical"
-                  margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
-                  barCategoryGap="25%"
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                  <XAxis
-                    type="number" allowDecimals={false}
-                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                    axisLine={false} tickLine={false}
-                  />
-                  <YAxis
-                    dataKey="range" type="category"
-                    axisLine={false} tickLine={false}
-                    tick={{ fontSize: 11, fill: "hsl(var(--foreground))", fontWeight: 500 }}
-                    width={62}
-                  />
-                  <Tooltip
-                    content={(props) => {
-                      if (!props.active || !props.payload?.length) return null;
-                      return (
-                        <div className="bg-popover border border-border/50 px-3 py-2 rounded-lg shadow-xl text-sm">
-                          <p className="font-semibold text-foreground">{String(props.label)} match</p>
-                          <p className="text-primary">{String(props.payload[0].value)} alerts</p>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Bar dataKey="count" name="Alerts" radius={[0, 4, 4, 0]} barSize={22}>
-                    {(scoreDistribution ?? []).map((entry, i) => {
-                      const score = entry.minScore;
-                      const color = score >= 90 ? PRIORITY_COLORS.HIGH
-                        : score >= 70 ? PRIORITY_COLORS.MEDIUM
-                        : score >= 50 ? PRIORITY_COLORS.WATCH
-                        : PRIORITY_COLORS.LOW;
-                      return <Cell key={i} fill={color} />;
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Row 4: Top Agencies + Rebid Timeline */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border-border/50 shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Most Active Agencies</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Alert frequency per watchlist account</p>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agencyData} layout="vertical" margin={{ top: 0, right: 40, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                    <XAxis type="number" hide allowDecimals={false} />
-                    <YAxis
-                      dataKey="agency" type="category" axisLine={false} tickLine={false}
-                      tick={{ fontSize: 10, fill: "hsl(var(--foreground))", fontWeight: 500 }}
-                      width={138}
-                      tickFormatter={(v: string) => v.length > 20 ? v.substring(0, 20) + "…" : v}
-                    />
-                    <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted)/0.5)" }} />
-                    <Bar dataKey="count" name="Alerts" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/50 shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Rebid Window Calendar</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Estimated procurement windows by account</p>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={ganttData}
-                    layout="vertical"
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                    <XAxis
-                      type="number"
-                      domain={["dataMin - 5184000000", "dataMax + 5184000000"]}
-                      tickFormatter={(v: number) => format(new Date(v), "MMM yy")}
-                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      axisLine={false} tickLine={false} orientation="top"
-                    />
-                    <YAxis
-                      dataKey="agency" type="category" axisLine={false} tickLine={false}
-                      tick={{ fontSize: 10, fill: "hsl(var(--foreground))", fontWeight: 500 }}
-                      width={130}
-                    />
-                    <Tooltip content={<GanttTooltip />} cursor={{ fill: "hsl(var(--muted)/0.4)" }} />
-                    <Bar dataKey="timeRange" radius={3} barSize={14}>
-                      {ganttData.map((entry, i) => (
-                        <Cell key={i} fill={PRIORITY_COLORS[entry.priority] ?? PRIORITY_COLORS.LOW} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Row 5: Federal Contract Expiry Table */}
-        <Card className="border-border/50 shadow-md">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              Federal Contract Expiry Watch
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Comparable USASpending.gov contracts — expiry signals recompete timing
-            </p>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/50">
-                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-6">Agency</th>
-                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-3">Priority</th>
-                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-3">TCV</th>
-                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-3">Incumbent</th>
-                    <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-3">Contract End</th>
-                    <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-3">Potential End</th>
-                    <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-6">Days to Expiry</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {(federalExpiry ?? []).map((entry) => {
-                    const urgency = entry.daysToExpiry != null
-                      ? entry.daysToExpiry < 90 ? "text-red-600 font-bold"
-                      : entry.daysToExpiry < 365 ? "text-amber-600 font-semibold"
-                      : "text-muted-foreground"
-                      : "text-muted-foreground";
-
-                    return (
-                      <tr key={entry.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-3 px-6 font-medium text-foreground">{entry.agency}</td>
-                        <td className="py-3 px-3"><PriorityBadge priority={entry.priority} /></td>
-                        <td className="py-3 px-3 text-right text-muted-foreground font-mono text-xs">
-                          {entry.tcv ? formatCurrency(entry.tcv) : "—"}
-                        </td>
-                        <td className="py-3 px-3 text-muted-foreground max-w-[180px] truncate" title={entry.usaSpendingRecipient ?? ""}>
-                          {entry.usaSpendingRecipient
-                            ? entry.usaSpendingRecipient.length > 22
-                              ? entry.usaSpendingRecipient.substring(0, 22) + "…"
-                              : entry.usaSpendingRecipient
-                            : <span className="text-muted-foreground/40 italic">No match</span>}
-                        </td>
-                        <td className="py-3 px-3 text-center text-muted-foreground font-mono text-xs">
-                          {entry.usaSpendingContractEnd
-                            ? format(new Date(entry.usaSpendingContractEnd + "T00:00:00"), "MMM d, yyyy")
-                            : "—"}
-                        </td>
-                        <td className="py-3 px-3 text-center text-muted-foreground font-mono text-xs">
-                          {entry.usaSpendingPotentialEnd
-                            ? format(new Date(entry.usaSpendingPotentialEnd + "T00:00:00"), "MMM d, yyyy")
-                            : "—"}
-                        </td>
-                        <td className={`py-3 px-6 text-center font-mono text-xs ${urgency}`}>
-                          {entry.daysToExpiry != null
-                            ? entry.daysToExpiry < 0
-                              ? "Expired"
-                              : `${entry.daysToExpiry.toLocaleString()}d`
-                            : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {(federalExpiry ?? []).length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-muted-foreground text-sm">
-                        No federal contract data yet — run a USASpending lookup from the Watchlist page
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </Layout>
   );

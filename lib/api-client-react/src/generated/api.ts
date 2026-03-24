@@ -39,6 +39,7 @@ import type {
   TcvByPriorityPoint,
   TopAgencyPoint,
   WatchlistEntry,
+  WinBackEntry,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -1937,6 +1938,81 @@ export function useGetFederalExpiry<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetFederalExpiryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get all watchlist accounts ranked by win-back composite score
+ */
+export const getGetWinBackReadinessUrl = () => {
+  return `/api/analytics/win-back-readiness`;
+};
+
+export const getWinBackReadiness = async (
+  options?: RequestInit,
+): Promise<WinBackEntry[]> => {
+  return customFetch<WinBackEntry[]>(getGetWinBackReadinessUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetWinBackReadinessQueryKey = () => {
+  return [`/api/analytics/win-back-readiness`] as const;
+};
+
+export const getGetWinBackReadinessQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWinBackReadiness>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getWinBackReadiness>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetWinBackReadinessQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getWinBackReadiness>>
+  > = ({ signal }) => getWinBackReadiness({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getWinBackReadiness>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetWinBackReadinessQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWinBackReadiness>>
+>;
+export type GetWinBackReadinessQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get all watchlist accounts ranked by win-back composite score
+ */
+
+export function useGetWinBackReadiness<
+  TData = Awaited<ReturnType<typeof getWinBackReadiness>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getWinBackReadiness>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetWinBackReadinessQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

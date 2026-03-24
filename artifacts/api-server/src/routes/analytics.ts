@@ -275,5 +275,147 @@ router.get("/analytics/federal-expiry", async (req: Request, res: Response): Pro
   }
 });
 
+router.get("/analytics/win-back-readiness", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        w.id,
+        w.agency,
+        w.priority,
+        w.tcv::float as tcv,
+        w.competitor,
+        w.state,
+        w.rebid_window_start,
+        w.rebid_window_end,
+        w.usa_spending_contract_end,
+        w.usa_spending_potential_end,
+        w.usa_spending_looked_up_at,
+        COUNT(a.id)::int as alert_count,
+        ROUND(MAX(a.match_score)::numeric, 3) as best_match_score,
+        EXTRACT(DAY FROM (w.rebid_window_start - NOW()))::int as days_to_open,
+        EXTRACT(DAY FROM (w.rebid_window_end - NOW()))::int as days_to_close
+      FROM watchlist_entries w
+      LEFT JOIN alerts a ON a.watchlist_agency = w.agency
+      GROUP BY w.id
+    `);
+
+    const entries = (result.rows as Array<Record<string, unknown>>).map((row) => {
+      const tcv = Number(row.tcv ?? 0);
+      const alertCount = Number(row.alert_count ?? 0);
+      const bestMatchScore = row.best_match_score != null ? Number(row.best_match_score) : null;
+      const daysToOpen = row.days_to_open != null ? Number(row.days_to_open) : null;
+      const daysToClose = row.days_to_close != null ? Number(row.days_to_close) : null;
+      const hasUsaSpendingIntel = row.usa_spending_looked_up_at != null;
+
+      // Urgency score (0-40)
+      let urgencyScore = 0;
+      if (daysToClose != null && daysToClose <= 0) {
+        urgencyScore = 0; // expired
+      } else if (daysToOpen != null && daysToOpen <= 0) {
+        urgencyScore = 40; // window is currently open
+      } else if (daysToOpen != null && daysToOpen <= 90) {
+        urgencyScore = 35; // opens very soon
+      } else if (daysToOpen != null && daysToOpen <= 180) {
+        urgencyScore = 25;
+      } else if (daysToOpen != null && daysToOpen <= 365) {
+        urgencyScore = 15;
+      } else {
+        urgencyScore = 5;
+      }
+
+      // Signal score (0-30)
+      let signalScore = 0;
+      if (alertCount > 0 && bestMatchScore != null) {
+        if (bestMatchScore >= 0.8) signalScore = 30;
+        else if (bestMatchScore >= 0.5) signalScore = 20;
+        else signalScore = 10;
+      }
+
+      // Intel score (0-20)
+      const intelScore = hasUsaSpendingIntel ? 20 : 0;
+
+      // Value score (0-10)
+      let valueScore = 1;
+      if (tcv >= 500000) valueScore = 10;
+      else if (tcv >= 200000) valueScore = 7;
+      else if (tcv >= 100000) valueScore = 5;
+      else if (tcv >= 50000) valueScore = 3;
+
+      const winBackScore = urgencyScore + signalScore + intelScore + valueScore;
+
+      // Status
+      let status: "ACT_NOW" | "IMMINENT" | "PREPARE" | "PLAN" | "EXPIRED";
+      if (daysToClose != null && daysToClose <= 0) {
+        status = "EXPIRED";
+      } else if (daysToOpen != null && daysToOpen <= 0) {
+        status = "ACT_NOW";
+      } else if (daysToOpen != null && daysToOpen <= 90) {
+        status = "IMMINENT";
+      } else if (daysToOpen != null && daysToOpen <= 365) {
+        status = "PREPARE";
+      } else {
+        status = "PLAN";
+      }
+
+      // Urgency label
+      const urgencyLabelMap: Record<string, string> = {
+        ACT_NOW: "In Rebid Window",
+        IMMINENT: `Opens in ${daysToOpen ?? "?"} days`,
+        PREPARE: `Opens in ${daysToOpen ?? "?"} days`,
+        PLAN: `Opens in ${daysToOpen ?? "?"} days`,
+        EXPIRED: "Window Closed",
+      };
+      const urgencyLabel = urgencyLabelMap[status] ?? "";
+
+      // Action hint
+      let actionHint = "Monitor for procurement signals";
+      if (status === "ACT_NOW") {
+        actionHint = alertCount > 0
+          ? `${alertCount} active signal${alertCount > 1 ? "s" : ""} — engage procurement team now`
+          : "Window open — initiate outreach now";
+      } else if (status === "IMMINENT") {
+        actionHint = alertCount > 0
+          ? `${alertCount} early signal${alertCount > 1 ? "s" : ""} — prepare proposal`
+          : "Begin discovery, 90 days to window";
+      } else if (status === "PREPARE") {
+        actionHint = hasUsaSpendingIntel
+          ? "Federal intel available — schedule stakeholder review"
+          : "Build relationship, identify new contacts";
+      } else if (status === "EXPIRED") {
+        actionHint = "Confirm if re-procured, update record";
+      }
+
+      return {
+        id: Number(row.id),
+        agency: String(row.agency),
+        priority: String(row.priority),
+        tcv,
+        competitor: String(row.competitor ?? ""),
+        state: String(row.state ?? ""),
+        rebidWindowStart: row.rebid_window_start ? String(row.rebid_window_start).slice(0, 10) : null,
+        rebidWindowEnd: row.rebid_window_end ? String(row.rebid_window_end).slice(0, 10) : null,
+        daysToOpen,
+        daysToClose,
+        alertCount,
+        bestMatchScore,
+        hasUsaSpendingIntel,
+        usaSpendingContractEnd: row.usa_spending_contract_end ? String(row.usa_spending_contract_end).slice(0, 10) : null,
+        winBackScore,
+        status,
+        urgencyLabel,
+        actionHint,
+      };
+    });
+
+    // Sort by win-back score descending
+    entries.sort((a, b) => b.winBackScore - a.winBackScore);
+
+    res.json(entries);
+  } catch (err) {
+    req.log.error({ err }, "Failed to get win-back readiness");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
 

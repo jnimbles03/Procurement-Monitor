@@ -456,6 +456,21 @@ paths:
                 items:
                   $ref: "#/components/schemas/FederalExpiryEntry"
 
+  /analytics/win-back-readiness:
+    get:
+      operationId: getWinBackReadiness
+      tags: [analytics]
+      summary: Get all watchlist accounts ranked by win-back composite score
+      responses:
+        "200":
+          description: Win-back readiness ranked list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WinBackEntry"
+
 components:
   schemas:
     HealthStatus:
@@ -922,3 +937,64 @@ components:
         - id
         - agency
         - priority
+
+    WinBackEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        agency:
+          type: string
+        priority:
+          type: string
+          enum: [HIGH, MEDIUM, WATCH, LOW]
+        tcv:
+          type: number
+        competitor:
+          type: string
+        state:
+          type: string
+        rebidWindowStart:
+          type: string
+          nullable: true
+        rebidWindowEnd:
+          type: string
+          nullable: true
+        daysToOpen:
+          type: integer
+          nullable: true
+        daysToClose:
+          type: integer
+          nullable: true
+        alertCount:
+          type: integer
+        bestMatchScore:
+          type: number
+          nullable: true
+        hasUsaSpendingIntel:
+          type: boolean
+        usaSpendingContractEnd:
+          type: string
+          nullable: true
+        winBackScore:
+          type: integer
+        status:
+          type: string
+          enum: [ACT_NOW, IMMINENT, PREPARE, PLAN, EXPIRED]
+        urgencyLabel:
+          type: string
+        actionHint:
+          type: string
+      required:
+        - id
+        - agency
+        - priority
+        - tcv
+        - competitor
+        - state
+        - alertCount
+        - hasUsaSpendingIntel
+        - winBackScore
+        - status
+        - urgencyLabel
+        - actionHint

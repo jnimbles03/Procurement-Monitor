@@ -23,7 +23,13 @@ router.post("/auth/login", (req: Request, res: Response): void => {
   }
 
   req.session.userEmail = email;
-  res.json({ success: true, email });
+  req.session.save((err) => {
+    if (err) {
+      res.status(500).json({ error: "Failed to create session" });
+      return;
+    }
+    res.json({ success: true, email });
+  });
 });
 
 router.get("/auth/user", (req: Request, res: Response): void => {
