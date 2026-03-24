@@ -28,6 +28,7 @@ export function useAuth() {
     retry: false,
   });
 
+  // Step 1: submit email → returns challenge question
   const loginMutation = useMutation({
     mutationFn: async (email: string) => {
       const res = await fetch(`${API}/auth/login`, {
@@ -37,8 +38,25 @@ export function useAuth() {
         body: JSON.stringify({ email }),
       });
       if (!res.ok) {
-        const data = (await res.json()) as { error: string };
-        throw new Error(data.error ?? "Login failed");
+        const body = (await res.json()) as { error: string };
+        throw new Error(body.error ?? "Login failed");
+      }
+      return res.json() as Promise<{ step: "challenge"; question: string }>;
+    },
+  });
+
+  // Step 2: submit challenge answer → creates session
+  const challengeMutation = useMutation({
+    mutationFn: async (answer: string) => {
+      const res = await fetch(`${API}/auth/challenge`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answer }),
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as { error: string };
+        throw new Error(body.error ?? "Incorrect answer");
       }
       return res.json() as Promise<{ success: boolean; email: string }>;
     },
@@ -64,9 +82,17 @@ export function useAuth() {
     user: data?.user ?? null,
     authenticated: data?.authenticated ?? false,
     isLoading,
-    login: (email: string) => loginMutation.mutateAsync(email),
-    loginPending: loginMutation.isPending,
-    loginError: loginMutation.error?.message ?? null,
+
+    // Step 1
+    submitEmail: (email: string) => loginMutation.mutateAsync(email),
+    emailPending: loginMutation.isPending,
+    emailError: loginMutation.error?.message ?? null,
+
+    // Step 2
+    submitChallenge: (answer: string) => challengeMutation.mutateAsync(answer),
+    challengePending: challengeMutation.isPending,
+    challengeError: challengeMutation.error?.message ?? null,
+
     logout: () => logoutMutation.mutate(),
   };
 }
