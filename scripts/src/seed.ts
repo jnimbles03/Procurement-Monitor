@@ -1,6 +1,5 @@
 import { db } from "@workspace/db";
 import { watchlistEntriesTable, configTable } from "@workspace/db";
-import { sql } from "drizzle-orm";
 
 const WATCHLIST_DATA = [
   {
