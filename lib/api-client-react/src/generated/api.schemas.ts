@@ -35,6 +35,8 @@ export interface WatchlistEntry {
   rebidWindowEnd?: string | null;
   priority: WatchlistEntryPriority;
   notes: string;
+  createdAt: string;
+  updatedAt: string;
   usaSpendingAwardId?: string | null;
   usaSpendingRecipient?: string | null;
   usaSpendingDescription?: string | null;
@@ -42,8 +44,6 @@ export interface WatchlistEntry {
   usaSpendingPotentialEnd?: string | null;
   usaSpendingAmount?: string | null;
   usaSpendingLookedUpAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export type CreateWatchlistEntryInputPriority =
@@ -173,6 +173,47 @@ export interface RebidTimelineEntry {
   rebidWindowStart?: string | null;
   rebidWindowEnd?: string | null;
   status: RebidTimelineEntryStatus;
+}
+
+export interface PipelineKpis {
+  totalTcv: number;
+  totalAlerts: number;
+  highPriorityAlerts: number;
+  avgMatchScore: number;
+  nextRebidDays?: number | null;
+  watchlistCount: number;
+  activeRebidCount: number;
+}
+
+export interface TcvByPriorityPoint {
+  priority: string;
+  tcv: number;
+  count: number;
+}
+
+export interface CompetitorBreakdownPoint {
+  competitor: string;
+  count: number;
+  totalTcv: number;
+}
+
+export interface MatchScoreDistributionPoint {
+  range: string;
+  count: number;
+  minScore: number;
+  maxScore: number;
+}
+
+export interface FederalExpiryEntry {
+  id: number;
+  agency: string;
+  priority: string;
+  tcv?: number | null;
+  usaSpendingRecipient?: string | null;
+  usaSpendingContractEnd?: string | null;
+  usaSpendingPotentialEnd?: string | null;
+  usaSpendingAmount?: string | null;
+  daysToExpiry?: number | null;
 }
 
 export type ListAlertsParams = {

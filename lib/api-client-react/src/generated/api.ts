@@ -22,16 +22,21 @@ import type {
   AlertsByPriorityPoint,
   AlertsOverTimePoint,
   AppConfig,
+  CompetitorBreakdownPoint,
   CreateWatchlistEntryInput,
   ErrorResponse,
+  FederalExpiryEntry,
   GetAlertsOverTimeParams,
   GetTopAgenciesParams,
   HealthStatus,
   ListAlertsParams,
   ListScanLogsParams,
+  MatchScoreDistributionPoint,
+  PipelineKpis,
   RebidTimelineEntry,
   ScanLog,
   ScanRequest,
+  TcvByPriorityPoint,
   TopAgencyPoint,
   WatchlistEntry,
 } from "./api.schemas";
@@ -1549,6 +1554,389 @@ export function useGetRebidTimeline<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetRebidTimelineQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get top-level pipeline KPI summary
+ */
+export const getGetPipelineKpisUrl = () => {
+  return `/api/analytics/pipeline-kpis`;
+};
+
+export const getPipelineKpis = async (
+  options?: RequestInit,
+): Promise<PipelineKpis> => {
+  return customFetch<PipelineKpis>(getGetPipelineKpisUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPipelineKpisQueryKey = () => {
+  return [`/api/analytics/pipeline-kpis`] as const;
+};
+
+export const getGetPipelineKpisQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPipelineKpis>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPipelineKpis>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPipelineKpisQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPipelineKpis>>> = ({
+    signal,
+  }) => getPipelineKpis({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPipelineKpis>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPipelineKpisQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPipelineKpis>>
+>;
+export type GetPipelineKpisQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get top-level pipeline KPI summary
+ */
+
+export function useGetPipelineKpis<
+  TData = Awaited<ReturnType<typeof getPipelineKpis>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPipelineKpis>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPipelineKpisQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get watchlist TCV broken down by priority
+ */
+export const getGetTcvByPriorityUrl = () => {
+  return `/api/analytics/tcv-by-priority`;
+};
+
+export const getTcvByPriority = async (
+  options?: RequestInit,
+): Promise<TcvByPriorityPoint[]> => {
+  return customFetch<TcvByPriorityPoint[]>(getGetTcvByPriorityUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTcvByPriorityQueryKey = () => {
+  return [`/api/analytics/tcv-by-priority`] as const;
+};
+
+export const getGetTcvByPriorityQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTcvByPriority>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTcvByPriority>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetTcvByPriorityQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTcvByPriority>>
+  > = ({ signal }) => getTcvByPriority({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTcvByPriority>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTcvByPriorityQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTcvByPriority>>
+>;
+export type GetTcvByPriorityQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get watchlist TCV broken down by priority
+ */
+
+export function useGetTcvByPriority<
+  TData = Awaited<ReturnType<typeof getTcvByPriority>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTcvByPriority>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTcvByPriorityQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get competitor deal count and TCV
+ */
+export const getGetCompetitorBreakdownUrl = () => {
+  return `/api/analytics/competitor-breakdown`;
+};
+
+export const getCompetitorBreakdown = async (
+  options?: RequestInit,
+): Promise<CompetitorBreakdownPoint[]> => {
+  return customFetch<CompetitorBreakdownPoint[]>(
+    getGetCompetitorBreakdownUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetCompetitorBreakdownQueryKey = () => {
+  return [`/api/analytics/competitor-breakdown`] as const;
+};
+
+export const getGetCompetitorBreakdownQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCompetitorBreakdown>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCompetitorBreakdown>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCompetitorBreakdownQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCompetitorBreakdown>>
+  > = ({ signal }) => getCompetitorBreakdown({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCompetitorBreakdown>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCompetitorBreakdownQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCompetitorBreakdown>>
+>;
+export type GetCompetitorBreakdownQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get competitor deal count and TCV
+ */
+
+export function useGetCompetitorBreakdown<
+  TData = Awaited<ReturnType<typeof getCompetitorBreakdown>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCompetitorBreakdown>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCompetitorBreakdownQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get alert match score distribution in 10% buckets
+ */
+export const getGetMatchScoreDistributionUrl = () => {
+  return `/api/analytics/match-score-distribution`;
+};
+
+export const getMatchScoreDistribution = async (
+  options?: RequestInit,
+): Promise<MatchScoreDistributionPoint[]> => {
+  return customFetch<MatchScoreDistributionPoint[]>(
+    getGetMatchScoreDistributionUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetMatchScoreDistributionQueryKey = () => {
+  return [`/api/analytics/match-score-distribution`] as const;
+};
+
+export const getGetMatchScoreDistributionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMatchScoreDistribution>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMatchScoreDistribution>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMatchScoreDistributionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMatchScoreDistribution>>
+  > = ({ signal }) => getMatchScoreDistribution({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMatchScoreDistribution>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMatchScoreDistributionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMatchScoreDistribution>>
+>;
+export type GetMatchScoreDistributionQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get alert match score distribution in 10% buckets
+ */
+
+export function useGetMatchScoreDistribution<
+  TData = Awaited<ReturnType<typeof getMatchScoreDistribution>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMatchScoreDistribution>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMatchScoreDistributionQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get watchlist entries with USASpending federal contract expiry data
+ */
+export const getGetFederalExpiryUrl = () => {
+  return `/api/analytics/federal-expiry`;
+};
+
+export const getFederalExpiry = async (
+  options?: RequestInit,
+): Promise<FederalExpiryEntry[]> => {
+  return customFetch<FederalExpiryEntry[]>(getGetFederalExpiryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetFederalExpiryQueryKey = () => {
+  return [`/api/analytics/federal-expiry`] as const;
+};
+
+export const getGetFederalExpiryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFederalExpiry>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getFederalExpiry>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetFederalExpiryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFederalExpiry>>
+  > = ({ signal }) => getFederalExpiry({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFederalExpiry>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetFederalExpiryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFederalExpiry>>
+>;
+export type GetFederalExpiryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get watchlist entries with USASpending federal contract expiry data
+ */
+
+export function useGetFederalExpiry<
+  TData = Awaited<ReturnType<typeof getFederalExpiry>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getFederalExpiry>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetFederalExpiryQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

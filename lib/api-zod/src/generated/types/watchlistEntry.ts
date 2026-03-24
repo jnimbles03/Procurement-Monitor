@@ -21,4 +21,11 @@ export interface WatchlistEntry {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  usaSpendingAwardId?: string | null;
+  usaSpendingRecipient?: string | null;
+  usaSpendingDescription?: string | null;
+  usaSpendingContractEnd?: string | null;
+  usaSpendingPotentialEnd?: string | null;
+  usaSpendingAmount?: string | null;
+  usaSpendingLookedUpAt?: string | null;
 }

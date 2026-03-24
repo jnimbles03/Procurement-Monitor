@@ -32,6 +32,13 @@ export const ListWatchlistEntriesResponseItem = zod.object({
   notes: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
+  usaSpendingAwardId: zod.string().nullish(),
+  usaSpendingRecipient: zod.string().nullish(),
+  usaSpendingDescription: zod.string().nullish(),
+  usaSpendingContractEnd: zod.string().nullish(),
+  usaSpendingPotentialEnd: zod.string().nullish(),
+  usaSpendingAmount: zod.string().nullish(),
+  usaSpendingLookedUpAt: zod.string().nullish(),
 });
 export const ListWatchlistEntriesResponse = zod.array(
   ListWatchlistEntriesResponseItem,
@@ -74,6 +81,13 @@ export const GetWatchlistEntryResponse = zod.object({
   notes: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
+  usaSpendingAwardId: zod.string().nullish(),
+  usaSpendingRecipient: zod.string().nullish(),
+  usaSpendingDescription: zod.string().nullish(),
+  usaSpendingContractEnd: zod.string().nullish(),
+  usaSpendingPotentialEnd: zod.string().nullish(),
+  usaSpendingAmount: zod.string().nullish(),
+  usaSpendingLookedUpAt: zod.string().nullish(),
 });
 
 /**
@@ -110,6 +124,13 @@ export const UpdateWatchlistEntryResponse = zod.object({
   notes: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
+  usaSpendingAwardId: zod.string().nullish(),
+  usaSpendingRecipient: zod.string().nullish(),
+  usaSpendingDescription: zod.string().nullish(),
+  usaSpendingContractEnd: zod.string().nullish(),
+  usaSpendingPotentialEnd: zod.string().nullish(),
+  usaSpendingAmount: zod.string().nullish(),
+  usaSpendingLookedUpAt: zod.string().nullish(),
 });
 
 /**
@@ -349,3 +370,67 @@ export const GetRebidTimelineResponseItem = zod.object({
   status: zod.enum(["upcoming", "active", "closed"]),
 });
 export const GetRebidTimelineResponse = zod.array(GetRebidTimelineResponseItem);
+
+/**
+ * @summary Get top-level pipeline KPI summary
+ */
+export const GetPipelineKpisResponse = zod.object({
+  totalTcv: zod.number(),
+  totalAlerts: zod.number(),
+  highPriorityAlerts: zod.number(),
+  avgMatchScore: zod.number(),
+  nextRebidDays: zod.number().nullish(),
+  watchlistCount: zod.number(),
+  activeRebidCount: zod.number(),
+});
+
+/**
+ * @summary Get watchlist TCV broken down by priority
+ */
+export const GetTcvByPriorityResponseItem = zod.object({
+  priority: zod.string(),
+  tcv: zod.number(),
+  count: zod.number(),
+});
+export const GetTcvByPriorityResponse = zod.array(GetTcvByPriorityResponseItem);
+
+/**
+ * @summary Get competitor deal count and TCV
+ */
+export const GetCompetitorBreakdownResponseItem = zod.object({
+  competitor: zod.string(),
+  count: zod.number(),
+  totalTcv: zod.number(),
+});
+export const GetCompetitorBreakdownResponse = zod.array(
+  GetCompetitorBreakdownResponseItem,
+);
+
+/**
+ * @summary Get alert match score distribution in 10% buckets
+ */
+export const GetMatchScoreDistributionResponseItem = zod.object({
+  range: zod.string(),
+  count: zod.number(),
+  minScore: zod.number(),
+  maxScore: zod.number(),
+});
+export const GetMatchScoreDistributionResponse = zod.array(
+  GetMatchScoreDistributionResponseItem,
+);
+
+/**
+ * @summary Get watchlist entries with USASpending federal contract expiry data
+ */
+export const GetFederalExpiryResponseItem = zod.object({
+  id: zod.number(),
+  agency: zod.string(),
+  priority: zod.string(),
+  tcv: zod.number().nullish(),
+  usaSpendingRecipient: zod.string().nullish(),
+  usaSpendingContractEnd: zod.string().nullish(),
+  usaSpendingPotentialEnd: zod.string().nullish(),
+  usaSpendingAmount: zod.string().nullish(),
+  daysToExpiry: zod.number().nullish(),
+});
+export const GetFederalExpiryResponse = zod.array(GetFederalExpiryResponseItem);

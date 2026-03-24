@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-24", "postgresql-16"]
 
 [[artifacts]]
 id = "artifacts/api-server"
@@ -29,3 +29,6 @@ timeoutMs = 20000
 
 [userenv.shared]
 SAM_API_KEY = "SAM-29db880b-64f6-496f-85c9-929bbc01401f"
+
+[nix]
+channel = "stable-25_05"

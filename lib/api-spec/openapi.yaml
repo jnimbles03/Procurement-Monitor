@@ -383,6 +383,79 @@ paths:
                 items:
                   $ref: "#/components/schemas/RebidTimelineEntry"
 
+  /analytics/pipeline-kpis:
+    get:
+      operationId: getPipelineKpis
+      tags: [analytics]
+      summary: Get top-level pipeline KPI summary
+      responses:
+        "200":
+          description: Pipeline KPIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineKpis"
+
+  /analytics/tcv-by-priority:
+    get:
+      operationId: getTcvByPriority
+      tags: [analytics]
+      summary: Get watchlist TCV broken down by priority
+      responses:
+        "200":
+          description: TCV by priority
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TcvByPriorityPoint"
+
+  /analytics/competitor-breakdown:
+    get:
+      operationId: getCompetitorBreakdown
+      tags: [analytics]
+      summary: Get competitor deal count and TCV
+      responses:
+        "200":
+          description: Competitor breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompetitorBreakdownPoint"
+
+  /analytics/match-score-distribution:
+    get:
+      operationId: getMatchScoreDistribution
+      tags: [analytics]
+      summary: Get alert match score distribution in 10% buckets
+      responses:
+        "200":
+          description: Match score distribution
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MatchScoreDistributionPoint"
+
+  /analytics/federal-expiry:
+    get:
+      operationId: getFederalExpiry
+      tags: [analytics]
+      summary: Get watchlist entries with USASpending federal contract expiry data
+      responses:
+        "200":
+          description: Federal contract expiry data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FederalExpiryEntry"
+
 components:
   schemas:
     HealthStatus:
@@ -435,6 +508,27 @@ components:
           type: string
         updatedAt:
           type: string
+        usaSpendingAwardId:
+          type: string
+          nullable: true
+        usaSpendingRecipient:
+          type: string
+          nullable: true
+        usaSpendingDescription:
+          type: string
+          nullable: true
+        usaSpendingContractEnd:
+          type: string
+          nullable: true
+        usaSpendingPotentialEnd:
+          type: string
+          nullable: true
+        usaSpendingAmount:
+          type: string
+          nullable: true
+        usaSpendingLookedUpAt:
+          type: string
+          nullable: true
       required:
         - id
         - agency
@@ -725,3 +819,106 @@ components:
         - priority
         - tcv
         - status
+
+    PipelineKpis:
+      type: object
+      properties:
+        totalTcv:
+          type: number
+        totalAlerts:
+          type: integer
+        highPriorityAlerts:
+          type: integer
+        avgMatchScore:
+          type: number
+        nextRebidDays:
+          type: integer
+          nullable: true
+        watchlistCount:
+          type: integer
+        activeRebidCount:
+          type: integer
+      required:
+        - totalTcv
+        - totalAlerts
+        - highPriorityAlerts
+        - avgMatchScore
+        - watchlistCount
+        - activeRebidCount
+
+    TcvByPriorityPoint:
+      type: object
+      properties:
+        priority:
+          type: string
+        tcv:
+          type: number
+        count:
+          type: integer
+      required:
+        - priority
+        - tcv
+        - count
+
+    CompetitorBreakdownPoint:
+      type: object
+      properties:
+        competitor:
+          type: string
+        count:
+          type: integer
+        totalTcv:
+          type: number
+      required:
+        - competitor
+        - count
+        - totalTcv
+
+    MatchScoreDistributionPoint:
+      type: object
+      properties:
+        range:
+          type: string
+        count:
+          type: integer
+        minScore:
+          type: integer
+        maxScore:
+          type: integer
+      required:
+        - range
+        - count
+        - minScore
+        - maxScore
+
+    FederalExpiryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        agency:
+          type: string
+        priority:
+          type: string
+        tcv:
+          type: number
+          nullable: true
+        usaSpendingRecipient:
+          type: string
+          nullable: true
+        usaSpendingContractEnd:
+          type: string
+          nullable: true
+        usaSpendingPotentialEnd:
+          type: string
+          nullable: true
+        usaSpendingAmount:
+          type: string
+          nullable: true
+        daysToExpiry:
+          type: integer
+          nullable: true
+      required:
+        - id
+        - agency
+        - priority
