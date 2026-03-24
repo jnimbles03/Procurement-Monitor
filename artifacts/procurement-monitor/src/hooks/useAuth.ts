@@ -1,10 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface AuthUser {
-  id: string;
   email: string;
-  name: string;
-  photo?: string;
 }
 
 interface AuthState {
@@ -31,6 +28,25 @@ export function useAuth() {
     retry: false,
   });
 
+  const loginMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error: string };
+        throw new Error(data.error ?? "Login failed");
+      }
+      return res.json() as Promise<{ success: boolean; email: string }>;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["auth-user"] });
+    },
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await fetch(`${API}/auth/logout`, {
@@ -44,15 +60,13 @@ export function useAuth() {
     },
   });
 
-  const login = () => {
-    window.location.href = `${API}/auth/google`;
-  };
-
   return {
     user: data?.user ?? null,
     authenticated: data?.authenticated ?? false,
     isLoading,
-    login,
+    login: (email: string) => loginMutation.mutateAsync(email),
+    loginPending: loginMutation.isPending,
+    loginError: loginMutation.error?.message ?? null,
     logout: () => logoutMutation.mutate(),
   };
 }

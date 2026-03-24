@@ -21,8 +21,6 @@
     "express-session": "^1.19.0",
     "multer": "^2.1.1",
     "node-cron": "^4.2.1",
-    "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0",
     "pino": "^9",
     "pino-http": "^10",
     "xlsx": "^0.18.5"
@@ -37,8 +35,6 @@
     "@types/multer": "^2.1.0",
     "@types/node": "catalog:",
     "@types/node-cron": "^3.0.11",
-    "@types/passport": "^1.0.17",
-    "@types/passport-google-oauth20": "^2.0.17",
     "esbuild": "^0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13",

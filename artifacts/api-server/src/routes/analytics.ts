@@ -5,15 +5,21 @@ import { sql } from "drizzle-orm";
 
 const router = Router();
 
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = parseInt(String(value ?? fallback), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(n, min), max);
+}
+
 router.get("/analytics/alerts-over-time", async (req: Request, res: Response): Promise<void> => {
   try {
-    const days = parseInt(String(req.query.days ?? "90"), 10);
+    const days = clampInt(req.query.days, 1, 365, 90);
     const result = await db.execute(sql`
       SELECT 
         DATE(timestamp)::text as date,
         COUNT(*)::int as count
       FROM alerts
-      WHERE timestamp >= NOW() - INTERVAL '${sql.raw(String(days))} days'
+      WHERE timestamp >= NOW() - (${days} * INTERVAL '1 day')
       GROUP BY DATE(timestamp)
       ORDER BY DATE(timestamp) ASC
     `);
@@ -43,7 +49,7 @@ router.get("/analytics/alerts-by-priority", async (req: Request, res: Response):
 
 router.get("/analytics/top-agencies", async (req: Request, res: Response): Promise<void> => {
   try {
-    const limit = parseInt(String(req.query.limit ?? "10"), 10);
+    const limit = clampInt(req.query.limit, 1, 100, 10);
     const result = await db.execute(sql`
       SELECT 
         watchlist_agency as agency,

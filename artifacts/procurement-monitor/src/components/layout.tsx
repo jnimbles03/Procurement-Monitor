@@ -66,19 +66,10 @@ export function AppSidebar() {
         <div className="p-4 border-t border-sidebar-border/50 flex flex-col gap-3">
           {user ? (
             <div className="flex items-center gap-3 px-2">
-              {user.photo ? (
-                <img
-                  src={user.photo}
-                  alt={user.name}
-                  className="w-8 h-8 rounded-full object-cover shrink-0"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                {user.email.charAt(0).toUpperCase()}
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-sidebar-foreground truncate">{user.name}</p>
                 <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
               </div>
               <Button
