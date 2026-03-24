@@ -81,6 +81,8 @@ function scoreMatch(opportunityText: string, searchTerms: string[], globalKeywor
   return Math.min(1.0, score);
 }
 
+const MAX_RATE_LIMIT_RETRIES = 3;
+
 async function fetchSamOpportunities(
   params: Record<string, string>,
   apiKey: string,
@@ -89,6 +91,7 @@ async function fetchSamOpportunities(
   const results: SamOpportunity[] = [];
   let offset = 0;
   const limit = 1000;
+  let rateLimitRetries = 0;
 
   while (true) {
     const queryParams = {
@@ -109,12 +112,18 @@ async function fetchSamOpportunities(
       const opps = data.opportunitiesData ?? [];
       results.push(...opps);
       await appendLog(`  Got ${opps.length} opportunities (total so far: ${results.length})`);
+      rateLimitRetries = 0; // reset on success
 
       if (opps.length < limit) break;
       offset += limit;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 429) {
-        await appendLog("  Rate limited (429). Waiting 60s...");
+        rateLimitRetries++;
+        if (rateLimitRetries > MAX_RATE_LIMIT_RETRIES) {
+          await appendLog(`  Rate limited (429) — exceeded ${MAX_RATE_LIMIT_RETRIES} retries. Skipping this query.`);
+          break;
+        }
+        await appendLog(`  Rate limited (429). Waiting 60s... (retry ${rateLimitRetries}/${MAX_RATE_LIMIT_RETRIES})`);
         await new Promise((resolve) => setTimeout(resolve, 60000));
         continue;
       }
