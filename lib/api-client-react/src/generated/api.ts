@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AlertBreakdown,
   AlertListResponse,
   AlertStats,
   AlertsByPriorityPoint,
@@ -634,6 +635,93 @@ export function useListAlerts<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListAlertsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get per-term match score breakdown for an alert
+ */
+export const getGetAlertBreakdownUrl = (id: number) => {
+  return `/api/alerts/${id}/breakdown`;
+};
+
+export const getAlertBreakdown = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AlertBreakdown> => {
+  return customFetch<AlertBreakdown>(getGetAlertBreakdownUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAlertBreakdownQueryKey = (id: number) => {
+  return [`/api/alerts/${id}/breakdown`] as const;
+};
+
+export const getGetAlertBreakdownQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAlertBreakdown>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAlertBreakdown>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAlertBreakdownQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAlertBreakdown>>
+  > = ({ signal }) => getAlertBreakdown(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAlertBreakdown>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAlertBreakdownQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAlertBreakdown>>
+>;
+export type GetAlertBreakdownQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get per-term match score breakdown for an alert
+ */
+
+export function useGetAlertBreakdown<
+  TData = Awaited<ReturnType<typeof getAlertBreakdown>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAlertBreakdown>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAlertBreakdownQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

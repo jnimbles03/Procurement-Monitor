@@ -7,6 +7,7 @@
  */
 
 export * from "./alert";
+export * from "./alertBreakdown";
 export * from "./alertListResponse";
 export * from "./alertsByPriorityPoint";
 export * from "./alertsOverTimePoint";
@@ -30,6 +31,7 @@ export * from "./scanLog";
 export * from "./scanLogStatus";
 export * from "./scanRequest";
 export * from "./tcvByPriorityPoint";
+export * from "./termBreakdown";
 export * from "./topAgencyPoint";
 export * from "./watchlistEntry";
 export * from "./watchlistEntryPriority";

@@ -216,6 +216,29 @@ export interface FederalExpiryEntry {
   daysToExpiry?: number | null;
 }
 
+export interface TermBreakdown {
+  term: string;
+  termWords: string[];
+  matchedWords: string[];
+  termScore: number;
+  isBestTerm: boolean;
+}
+
+export interface AlertBreakdown {
+  id: number;
+  opportunityTitle: string;
+  matchScore: number;
+  watchlistAgency: string;
+  searchTerms: string[];
+  watchlistReason: string;
+  watchlistNotes: string;
+  termBreakdowns: TermBreakdown[];
+  baseScore: number;
+  globalKeywordBonus: number;
+  globalKeywordsMatched: string[];
+  oppWordsUsed: string[];
+}
+
 export type WinBackEntryPriority =
   (typeof WinBackEntryPriority)[keyof typeof WinBackEntryPriority];
 

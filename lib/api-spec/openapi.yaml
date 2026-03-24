@@ -184,6 +184,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/AlertListResponse"
 
+  /alerts/{id}/breakdown:
+    get:
+      operationId: getAlertBreakdown
+      tags: [alerts]
+      summary: Get per-term match score breakdown for an alert
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Match score breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertBreakdown"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /alerts/{id}:
     delete:
       operationId: deleteAlert
@@ -937,6 +962,79 @@ components:
         - id
         - agency
         - priority
+
+    TermBreakdown:
+      type: object
+      properties:
+        term:
+          type: string
+        termWords:
+          type: array
+          items:
+            type: string
+        matchedWords:
+          type: array
+          items:
+            type: string
+        termScore:
+          type: number
+        isBestTerm:
+          type: boolean
+      required:
+        - term
+        - termWords
+        - matchedWords
+        - termScore
+        - isBestTerm
+
+    AlertBreakdown:
+      type: object
+      properties:
+        id:
+          type: integer
+        opportunityTitle:
+          type: string
+        matchScore:
+          type: number
+        watchlistAgency:
+          type: string
+        searchTerms:
+          type: array
+          items:
+            type: string
+        watchlistReason:
+          type: string
+        watchlistNotes:
+          type: string
+        termBreakdowns:
+          type: array
+          items:
+            $ref: "#/components/schemas/TermBreakdown"
+        baseScore:
+          type: number
+        globalKeywordBonus:
+          type: number
+        globalKeywordsMatched:
+          type: array
+          items:
+            type: string
+        oppWordsUsed:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - opportunityTitle
+        - matchScore
+        - watchlistAgency
+        - searchTerms
+        - watchlistReason
+        - watchlistNotes
+        - termBreakdowns
+        - baseScore
+        - globalKeywordBonus
+        - globalKeywordsMatched
+        - oppWordsUsed
 
     WinBackEntry:
       type: object

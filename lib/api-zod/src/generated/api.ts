@@ -181,6 +181,36 @@ export const ListAlertsResponse = zod.object({
 });
 
 /**
+ * @summary Get per-term match score breakdown for an alert
+ */
+export const GetAlertBreakdownParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAlertBreakdownResponse = zod.object({
+  id: zod.number(),
+  opportunityTitle: zod.string(),
+  matchScore: zod.number(),
+  watchlistAgency: zod.string(),
+  searchTerms: zod.array(zod.string()),
+  watchlistReason: zod.string(),
+  watchlistNotes: zod.string(),
+  termBreakdowns: zod.array(
+    zod.object({
+      term: zod.string(),
+      termWords: zod.array(zod.string()),
+      matchedWords: zod.array(zod.string()),
+      termScore: zod.number(),
+      isBestTerm: zod.boolean(),
+    }),
+  ),
+  baseScore: zod.number(),
+  globalKeywordBonus: zod.number(),
+  globalKeywordsMatched: zod.array(zod.string()),
+  oppWordsUsed: zod.array(zod.string()),
+});
+
+/**
  * @summary Delete an alert
  */
 export const DeleteAlertParams = zod.object({
