@@ -7,8 +7,8 @@ import {
   useDeleteWatchlistEntry,
   type WatchlistEntry,
 } from "@workspace/api-client-react";
-import { format } from "date-fns";
-import { Plus, Upload, Trash2, Pencil, Search, Building, Loader2 } from "lucide-react";
+import { format, parseISO, isValid } from "date-fns";
+import { Plus, Upload, Trash2, Pencil, Search, Building, Loader2, Database, ShieldCheck, ExternalLink } from "lucide-react";
 import { formatCurrency, calculateRebidStatus } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -161,6 +161,7 @@ export default function Watchlist() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [addForm, setAddForm] = useState<EntryFormData>(defaultForm());
@@ -201,6 +202,24 @@ export default function Watchlist() {
       },
     },
   });
+
+  const handleEnrichUSASpending = async () => {
+    setIsEnriching(true);
+    try {
+      const resp = await fetch("/api/watchlist/enrich-usaspending", { method: "POST" });
+      if (!resp.ok) throw new Error("Enrichment request failed");
+      const result = await resp.json() as { enriched: number; notFound: number };
+      await queryClient.invalidateQueries({ queryKey: watchlistQueryKey });
+      toast({
+        title: "USASpending lookup complete",
+        description: `${result.enriched} federal contracts found, ${result.notFound} entries have no federal match.`,
+      });
+    } catch (err) {
+      toast({ title: "Lookup failed", description: String(err instanceof Error ? err.message : err), variant: "destructive" });
+    } finally {
+      setIsEnriching(false);
+    }
+  };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -281,6 +300,20 @@ export default function Watchlist() {
             </Button>
 
             <Button
+              variant="outline"
+              className="bg-background shadow-sm border-blue-200 text-blue-700 hover:bg-blue-50"
+              onClick={handleEnrichUSASpending}
+              disabled={isEnriching}
+              title="Query USASpending.gov to find real federal contract expiry dates for each entry"
+            >
+              {isEnriching ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning USASpending...</>
+              ) : (
+                <><Database className="w-4 h-4 mr-2" /> Lookup USASpending</>
+              )}
+            </Button>
+
+            <Button
               className="shadow-md shadow-primary/20"
               onClick={() => {
                 setAddForm(defaultForm());
@@ -345,18 +378,30 @@ export default function Watchlist() {
                   <th className="px-6 py-4 font-semibold">TCV</th>
                   <th className="px-6 py-4 font-semibold">Competitor</th>
                   <th className="px-6 py-4 font-semibold">Rebid Window</th>
+                  <th className="px-6 py-4 font-semibold">
+                    <div className="flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-blue-500" />
+                      Federal Intel
+                    </div>
+                  </th>
                   <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
                 {isLoading ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground animate-pulse">Loading entries...</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground animate-pulse">Loading entries...</td></tr>
                 ) : filteredEntries.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No watchlist entries found.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No watchlist entries found.</td></tr>
                 ) : (
                   filteredEntries.map((entry) => {
                     const status = calculateRebidStatus(entry.rebidWindowStart, entry.rebidWindowEnd);
                     const isHigh = entry.priority === "HIGH";
+                    const hasUSA = !!entry.usaSpendingLookedUpAt;
+                    const hasMatch = hasUSA && !!entry.usaSpendingAwardId;
+
+                    const potentialEnd = entry.usaSpendingPotentialEnd;
+                    const endDate = potentialEnd && isValid(parseISO(potentialEnd)) ? parseISO(potentialEnd) : null;
+                    const isExpiringSoon = endDate && (endDate.getTime() - Date.now()) < 365 * 24 * 60 * 60 * 1000;
 
                     return (
                       <tr key={entry.id} className={`hover:bg-muted/20 transition-colors ${isHigh ? "bg-destructive/5" : ""}`}>
@@ -387,6 +432,44 @@ export default function Watchlist() {
                               {entry.rebidWindowEnd ? format(new Date(entry.rebidWindowEnd), "MMM yyyy") : "?"}
                             </span>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 min-w-[180px]">
+                          {!hasUSA ? (
+                            <span className="text-xs text-muted-foreground italic">Not looked up</span>
+                          ) : !hasMatch ? (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 inline-block" />
+                              No federal match
+                            </span>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <ShieldCheck className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span className="text-xs font-semibold text-blue-700">
+                                  {endDate ? (
+                                    <span className={isExpiringSoon ? "text-amber-600 font-bold" : ""}>
+                                      Expires {format(endDate, "MMM yyyy")}
+                                    </span>
+                                  ) : "Contract found"}
+                                </span>
+                              </div>
+                              {entry.usaSpendingRecipient && (
+                                <p className="text-xs text-muted-foreground truncate max-w-[160px]" title={entry.usaSpendingRecipient}>
+                                  via {entry.usaSpendingRecipient}
+                                </p>
+                              )}
+                              {entry.usaSpendingAwardId && (
+                                <a
+                                  href={`https://www.usaspending.gov/award/CONT_AWD_${entry.usaSpendingAwardId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-500 hover:underline flex items-center gap-0.5"
+                                >
+                                  {entry.usaSpendingAwardId} <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">

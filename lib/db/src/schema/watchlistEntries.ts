@@ -14,6 +14,13 @@ export const watchlistEntriesTable = pgTable("watchlist_entries", {
   rebidWindowEnd: date("rebid_window_end"),
   priority: text("priority").notNull().default("WATCH"),
   notes: text("notes").notNull().default(""),
+  usaSpendingAwardId: text("usa_spending_award_id"),
+  usaSpendingRecipient: text("usa_spending_recipient"),
+  usaSpendingDescription: text("usa_spending_description"),
+  usaSpendingContractEnd: text("usa_spending_contract_end"),
+  usaSpendingPotentialEnd: text("usa_spending_potential_end"),
+  usaSpendingAmount: text("usa_spending_amount"),
+  usaSpendingLookedUpAt: timestamp("usa_spending_looked_up_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -35,6 +35,13 @@ export interface WatchlistEntry {
   rebidWindowEnd?: string | null;
   priority: WatchlistEntryPriority;
   notes: string;
+  usaSpendingAwardId?: string | null;
+  usaSpendingRecipient?: string | null;
+  usaSpendingDescription?: string | null;
+  usaSpendingContractEnd?: string | null;
+  usaSpendingPotentialEnd?: string | null;
+  usaSpendingAmount?: string | null;
+  usaSpendingLookedUpAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

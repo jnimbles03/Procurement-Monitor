@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Full-stack **Public Sector Procurement Monitor** — a sales intelligence tool for tracking government procurement opportunities matching a watchlist of previously lost deals.
+pnpm workspace monorepo using TypeScript. Full-stack **Public Sector Procurement Monitor** — a sales intelligence tool for tracking government procurement opportunities matching a watchlist of previously lost deals. Integrates with SAM.gov (active solicitations) and USASpending.gov (awarded contract history + real rebid date prediction).
 
 ## Stack
 

@@ -6,6 +6,7 @@ import scanRouter from "./scan";
 import configRouter from "./config";
 import analyticsRouter from "./analytics";
 import importRouter from "./import";
+import usaSpendingRouter from "./usaSpending";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(scanRouter);
 router.use(configRouter);
 router.use(analyticsRouter);
 router.use(importRouter);
+router.use(usaSpendingRouter);
 
 export default router;
