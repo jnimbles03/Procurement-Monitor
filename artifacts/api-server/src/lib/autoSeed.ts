@@ -1,6 +1,8 @@
 import { db } from "@workspace/db";
 import { watchlistEntriesTable, configTable } from "@workspace/db";
+import { isNull } from "drizzle-orm";
 import { logger } from "./logger";
+import { enrichAllEntries } from "../services/usaSpendingService";
 
 const WATCHLIST_DATA = [
   { agency: "Citizens Property Insurance", searchTerms: ["citizens property insurance", "citizens insurance esignature"], state: "FL", tcv: "704062", reason: "No Decision / Project Delayed", competitor: "Adobe", rebidWindowStart: "2025-04-01", rebidWindowEnd: "2026-06-30", priority: "HIGH", notes: "Explicitly delayed to Q4 2024. Salesforce integration deal." },
@@ -40,11 +42,35 @@ const DEFAULT_CONFIG = [
   { key: "email_recipients", value: "[]" },
 ];
 
+function runEnrichmentInBackground(): void {
+  logger.info("Starting USASpending enrichment in background...");
+  enrichAllEntries()
+    .then(({ enriched, notFound }) => {
+      logger.info({ enriched, notFound }, "USASpending auto-enrichment complete");
+    })
+    .catch((err) => {
+      logger.error({ err }, "USASpending auto-enrichment failed");
+    });
+}
+
 export async function autoSeedIfEmpty(): Promise<void> {
   try {
     const existing = await db.select().from(watchlistEntriesTable);
+
     if (existing.length > 0) {
       logger.info({ count: existing.length }, "Database already seeded — skipping");
+
+      // Entries exist but have never had USASpending looked up — enrich now
+      const unenriched = await db
+        .select()
+        .from(watchlistEntriesTable)
+        .where(isNull(watchlistEntriesTable.usaSpendingLookedUpAt));
+
+      if (unenriched.length > 0) {
+        logger.info({ count: unenriched.length }, "Entries missing USASpending data — enriching in background");
+        runEnrichmentInBackground();
+      }
+
       return;
     }
 
@@ -56,6 +82,9 @@ export async function autoSeedIfEmpty(): Promise<void> {
       await db.insert(configTable).values(cfg).onConflictDoNothing();
     }
     logger.info("Config seeded");
+
+    // Kick off USASpending enrichment in background immediately after seed
+    runEnrichmentInBackground();
   } catch (err) {
     logger.error({ err }, "Auto-seed failed — app will continue without seed data");
   }
