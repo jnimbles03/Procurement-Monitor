@@ -73,9 +73,9 @@ function InfoTooltip({ content }: { content: string }) {
         <HelpCircle className="w-3.5 h-3.5" />
       </button>
       {visible && (
-        <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-800 border border-slate-600 text-xs text-slate-200 rounded-lg p-3 shadow-2xl leading-relaxed pointer-events-none">
+        <span className="absolute z-[200] top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-slate-800 border border-slate-600 text-xs text-slate-200 rounded-lg p-3 shadow-2xl leading-relaxed pointer-events-none">
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-600" />
           {content}
-          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-600" />
         </span>
       )}
     </span>

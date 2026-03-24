@@ -105,10 +105,10 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="flex h-screen w-full bg-background overflow-hidden selection:bg-primary/20">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="h-16 flex items-center px-6 bg-card/50 backdrop-blur-md border-b border-border/60 shrink-0 z-10">
+          <header className="relative h-16 flex items-center px-6 bg-background border-b border-border/60 shrink-0 z-20">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors hover-elevate" />
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto bg-background">
             <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
