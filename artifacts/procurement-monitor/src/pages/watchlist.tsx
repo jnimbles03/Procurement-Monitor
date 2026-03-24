@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Layout } from "@/components/layout";
 import {
   useListWatchlistEntries,
@@ -8,7 +8,7 @@ import {
   type WatchlistEntry,
 } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Plus, Upload, Trash2, Pencil, Search, Building } from "lucide-react";
+import { Plus, Upload, Trash2, Pencil, Search, Building, Loader2 } from "lucide-react";
 import { formatCurrency, calculateRebidStatus } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -159,6 +159,8 @@ export default function Watchlist() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [addForm, setAddForm] = useState<EntryFormData>(defaultForm());
@@ -200,6 +202,30 @@ export default function Watchlist() {
     },
   });
 
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const resp = await fetch("/api/watchlist/import", { method: "POST", body: formData });
+      if (!resp.ok) {
+        const err = await resp.json() as { error?: string };
+        throw new Error(err.error ?? "Import failed");
+      }
+      const result = await resp.json() as { imported: number };
+      await queryClient.invalidateQueries({ queryKey: watchlistQueryKey });
+      toast({ title: "Import successful", description: `${result.imported} entries imported.` });
+    } catch (err) {
+      toast({ title: "Import failed", description: String(err instanceof Error ? err.message : err), variant: "destructive" });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const filteredEntries = (entries ?? []).filter(
     e =>
       e.agency.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -232,12 +258,24 @@ export default function Watchlist() {
             <p className="text-muted-foreground mt-1">Manage target agencies, lost deals, and upcoming rebids.</p>
           </div>
           <div className="flex items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={handleImportFile}
+            />
             <Button
               variant="outline"
               className="bg-background shadow-sm"
-              onClick={() => toast({ title: "Excel import", description: "Upload an Excel file to bulk-import watchlist entries. (Feature coming soon)" })}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
             >
-              <Upload className="w-4 h-4 mr-2" /> Import Excel
+              {isImporting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing...</>
+              ) : (
+                <><Upload className="w-4 h-4 mr-2" /> Import Excel</>
+              )}
             </Button>
 
             <Button

@@ -13,11 +13,10 @@ export function formatCurrency(value: string | number) {
 }
 
 export function calculateRebidStatus(start?: string | null, end?: string | null): "UPCOMING" | "ACTIVE" | "CLOSED" {
-  // Using the requested baseline date of 2026-03-24 for the demo
-  const today = new Date("2026-03-24").getTime();
-  
+  const today = Date.now();
+
   if (!start && !end) return "UPCOMING";
-  
+
   const startTime = start ? new Date(start).getTime() : 0;
   const endTime = end ? new Date(end).getTime() : Infinity;
 

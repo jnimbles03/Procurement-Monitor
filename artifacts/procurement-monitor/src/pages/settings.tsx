@@ -168,25 +168,67 @@ export default function Settings() {
             </Card>
 
             {/* Email */}
-            <Card className="border-border/50 shadow-sm opacity-60 hover:opacity-100 transition-opacity">
+            <Card className="border-border/50 shadow-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Mail className="w-5 h-5 text-primary" /> Email Notifications <span className="text-[10px] uppercase bg-muted px-2 py-0.5 rounded ml-2 tracking-wider">Beta</span>
+                  <Mail className="w-5 h-5 text-primary" /> Email Notifications
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                 <label className="flex items-center gap-3 p-3 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/30 transition-colors">
-                  <input 
-                    type="checkbox" 
+                <label className="flex items-center gap-3 p-3 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/30 transition-colors">
+                  <input
+                    type="checkbox"
                     checked={formData.emailEnabled}
                     onChange={e => setFormData({...formData, emailEnabled: e.target.checked})}
                     className="w-4 h-4 rounded text-primary focus:ring-primary"
                   />
                   <div>
                     <p className="font-semibold text-sm">Send Alert Digests</p>
-                    <p className="text-xs text-muted-foreground">Deliver high-priority alerts to team.</p>
+                    <p className="text-xs text-muted-foreground">Deliver high-priority alerts to team inbox.</p>
                   </div>
                 </label>
+
+                {formData.emailEnabled && (
+                  <div className="space-y-4 pt-2 animate-in slide-in-from-top-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold">SMTP Server</label>
+                        <Input
+                          value={formData.emailSmtpServer}
+                          onChange={e => setFormData({...formData, emailSmtpServer: e.target.value})}
+                          placeholder="smtp.gmail.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold">SMTP Port</label>
+                        <Input
+                          type="number"
+                          value={formData.emailSmtpPort}
+                          onChange={e => setFormData({...formData, emailSmtpPort: parseInt(e.target.value) || 587})}
+                          placeholder="587"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Sender Email</label>
+                      <Input
+                        type="email"
+                        value={formData.emailSenderEmail}
+                        onChange={e => setFormData({...formData, emailSenderEmail: e.target.value})}
+                        placeholder="alerts@yourcompany.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Recipients (one per line)</label>
+                      <textarea
+                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        value={formData.emailRecipients.join('\n')}
+                        onChange={e => setFormData({...formData, emailRecipients: e.target.value.split('\n').map(s => s.trim()).filter(Boolean)})}
+                        placeholder="team@company.com&#10;manager@company.com"
+                      />
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
