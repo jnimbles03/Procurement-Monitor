@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { initScheduler } from "./services/scheduler";
+import { autoSeedIfEmpty } from "./lib/autoSeed";
 
 const rawPort = process.env["PORT"];
 
@@ -23,6 +24,10 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  autoSeedIfEmpty().catch((err) => {
+    logger.error({ err }, "Auto-seed encountered an error");
+  });
 
   initScheduler().catch((schedErr) => {
     logger.error({ err: schedErr }, "Failed to start scheduler");
