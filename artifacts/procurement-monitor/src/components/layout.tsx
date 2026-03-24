@@ -1,7 +1,9 @@
 import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { LayoutDashboard, List, Search, Settings, BarChart, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, List, Search, Settings, BarChart, ShieldAlert, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const navigation = [
   { title: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -13,6 +15,7 @@ const navigation = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <Sidebar variant="sidebar" className="border-r border-sidebar-border shadow-xl">
@@ -60,11 +63,40 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Footer */}
-        <div className="p-6 border-t border-sidebar-border/50">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-sidebar-foreground/60 font-medium">System Active</span>
-          </div>
+        <div className="p-4 border-t border-sidebar-border/50 flex flex-col gap-3">
+          {user ? (
+            <div className="flex items-center gap-3 px-2">
+              {user.photo ? (
+                <img
+                  src={user.photo}
+                  alt={user.name}
+                  className="w-8 h-8 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-sidebar-foreground truncate">{user.name}</p>
+                <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-sidebar-foreground/50 hover:text-sidebar-foreground shrink-0"
+                onClick={logout}
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-sidebar-foreground/60 font-medium">System Active</span>
+            </div>
+          )}
         </div>
       </SidebarContent>
     </Sidebar>

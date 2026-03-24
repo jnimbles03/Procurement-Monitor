@@ -7,10 +7,16 @@ import configRouter from "./config";
 import analyticsRouter from "./analytics";
 import importRouter from "./import";
 import usaSpendingRouter from "./usaSpending";
+import authRouter from "./auth";
+import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
+
+router.use(requireAuth);
+
 router.use(watchlistRouter);
 router.use(alertsRouter);
 router.use(scanRouter);

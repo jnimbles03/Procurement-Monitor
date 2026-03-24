@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,25 +9,65 @@ import Watchlist from "@/pages/watchlist";
 import RunScan from "@/pages/run-scan";
 import Settings from "@/pages/settings";
 import Analytics from "@/pages/analytics";
+import Login from "@/pages/login";
+import { useAuth } from "@/hooks/useAuth";
 
-// Ensure cache invalidation is aggressive for this internal tool
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: true,
-      staleTime: 1000 * 60, // 1 minute
+      staleTime: 1000 * 60,
     },
   },
 });
 
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { authenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-sidebar flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    return <Redirect to="/login" />;
+  }
+
+  return <>{children}</>;
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/watchlist" component={Watchlist} />
-      <Route path="/scan" component={RunScan} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/analytics" component={Analytics} />
+      <Route path="/login" component={Login} />
+      <Route path="/">
+        <AuthGuard>
+          <Dashboard />
+        </AuthGuard>
+      </Route>
+      <Route path="/watchlist">
+        <AuthGuard>
+          <Watchlist />
+        </AuthGuard>
+      </Route>
+      <Route path="/scan">
+        <AuthGuard>
+          <RunScan />
+        </AuthGuard>
+      </Route>
+      <Route path="/settings">
+        <AuthGuard>
+          <Settings />
+        </AuthGuard>
+      </Route>
+      <Route path="/analytics">
+        <AuthGuard>
+          <Analytics />
+        </AuthGuard>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
