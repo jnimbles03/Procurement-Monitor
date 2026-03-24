@@ -50,7 +50,7 @@ export default function Login() {
             <Input
               id="email"
               type="email"
-              placeholder="you@docusign.com"
+              placeholder="your@work-email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loginPending}
@@ -74,7 +74,7 @@ export default function Login() {
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            Only @docusign.com accounts are permitted
+            Access is restricted to authorized accounts only
           </p>
         </form>
       </div>
