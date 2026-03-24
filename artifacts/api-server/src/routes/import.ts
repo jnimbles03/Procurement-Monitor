@@ -63,10 +63,24 @@ function coerceRow(row: ExcelRow) {
   };
 }
 
+const ALLOWED_MIMETYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/csv",
+  "application/csv",
+]);
+
+const MAX_ROWS = 500;
+
 router.post("/watchlist/import", upload.single("file"), async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    if (!ALLOWED_MIMETYPES.has(req.file.mimetype) && !req.file.originalname.match(/\.(xlsx|xls|csv)$/i)) {
+      res.status(400).json({ error: "Unsupported file type. Please upload .xlsx, .xls, or .csv files." });
       return;
     }
 
@@ -80,7 +94,10 @@ router.post("/watchlist/import", upload.single("file"), async (req: Request, res
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet!, { defval: "" });
 
-    const validRows = rows.map(coerceRow).filter((r): r is NonNullable<ReturnType<typeof coerceRow>> => r !== null);
+    const validRows = rows
+      .slice(0, MAX_ROWS)
+      .map(coerceRow)
+      .filter((r): r is NonNullable<ReturnType<typeof coerceRow>> => r !== null);
 
     if (validRows.length === 0) {
       res.status(400).json({ error: "No valid rows found. Ensure the file has an 'Agency' column." });

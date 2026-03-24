@@ -212,8 +212,10 @@ export default function Watchlist() {
       formData.append("file", file);
       const resp = await fetch("/api/watchlist/import", { method: "POST", body: formData });
       if (!resp.ok) {
-        const err = await resp.json() as { error?: string };
-        throw new Error(err.error ?? "Import failed");
+        const text = await resp.text();
+        let errMsg = "Import failed";
+        try { errMsg = (JSON.parse(text) as { error?: string }).error ?? errMsg; } catch { /* non-JSON response */ }
+        throw new Error(errMsg);
       }
       const result = await resp.json() as { imported: number };
       await queryClient.invalidateQueries({ queryKey: watchlistQueryKey });
