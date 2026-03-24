@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Layout } from "@/components/layout";
 import {
   useGetWinBackReadiness,
@@ -5,16 +6,10 @@ import {
   useGetMatchScoreDistribution,
   useGetTcvByPriority,
 } from "@workspace/api-client-react";
-import type { WinBackEntry } from "@workspace/api-client-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
-import { format, parseISO } from "date-fns";
+import type { WinBackEntry, CompetitorBreakdownPoint } from "@workspace/api-client-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Cell } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Target, Zap, AlertTriangle, TrendingUp, Users, Brain, Clock, CheckCircle2,
-} from "lucide-react";
+import { Target, Zap, AlertTriangle, TrendingUp, Users, Brain, Clock, CheckCircle2, HelpCircle } from "lucide-react";
 
 const PRIORITY_COLORS: Record<string, string> = {
   HIGH: "hsl(0, 84%, 60%)",
@@ -31,43 +26,256 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; b
   EXPIRED: { label: "EXPIRED", bg: "bg-slate-900", text: "text-slate-500", border: "border-slate-700" },
 };
 
-const COMPETITOR_PLAYBOOK: Record<string, { weakness: string; angle: string }> = {
-  Adobe: {
-    weakness: "High licensing cost, limited e-signature workflow depth",
-    angle: "Lead with DocuSign CLM integration + compliance automation — Adobe lacks native contract lifecycle.",
-  },
-  IronClad: {
-    weakness: "Contract-focused, weak on forms & citizen-facing workflows",
-    angle: "Emphasize DocuSign Forms + government identity verification. IronClad has no public-sector UX story.",
-  },
-  "Madison Cloud": {
-    weakness: "Niche federal integrator, limited commercial-grade scale",
-    angle: "Highlight FedRAMP authorization + ATO track record at scale. Madison Cloud can't match enterprise SLA.",
-  },
-  Nintex: {
-    weakness: "Workflow automation-first, e-signature is a bolt-on",
-    angle: "Lead with eSign reliability and audit trail — Nintex customers report signature failures in compliance audits.",
-  },
-  Authorium: {
-    weakness: "State/local grant-writing focus, narrow use-case",
-    angle: "Show breadth: DocuSign handles grants AND contracts AND permits — Authorium locks agencies into one workflow.",
-  },
-  DocaPost: {
-    weakness: "European vendor, limited US FedRAMP presence",
-    angle: "FedRAMP + US data residency is a hard requirement. Emphasize FEDRAMP High impact level.",
-  },
-  "Global Solutions Group": {
-    weakness: "Regional SI, limited product investment",
-    angle: "DocuSign's product roadmap and Salesforce/ServiceNow integrations far outpace a reseller's offering.",
-  },
+// Competitive advantage ratings per dimension (1–5, higher = stronger DocuSign advantage)
+const PLAYBOOK_RATINGS: Record<string, { cost: number; esign: number; compliance: number; integrations: number; govPresence: number; angle: string }> = {
+  Adobe:               { cost: 2, esign: 4, compliance: 3, integrations: 5, govPresence: 5, angle: "Lead with CLM + compliance automation — Adobe lacks native contract lifecycle." },
+  IronClad:            { cost: 3, esign: 5, compliance: 5, integrations: 4, govPresence: 4, angle: "Emphasize Forms + government identity verification — IronClad has no public-sector UX." },
+  "Madison Cloud":     { cost: 3, esign: 5, compliance: 4, integrations: 5, govPresence: 4, angle: "Highlight FedRAMP ATO at scale — Madison Cloud can't match enterprise SLA." },
+  Nintex:              { cost: 3, esign: 5, compliance: 4, integrations: 3, govPresence: 3, angle: "Lead with eSign reliability + audit trail — Nintex signatures fail compliance audits." },
+  Authorium:           { cost: 2, esign: 5, compliance: 4, integrations: 5, govPresence: 4, angle: "Show breadth: grants + contracts + permits — Authorium locks agencies into one workflow." },
+  DocaPost:            { cost: 3, esign: 4, compliance: 5, integrations: 4, govPresence: 5, angle: "FedRAMP + US data residency are hard requirements — DocaPost has no US FedRAMP." },
+  "Global Solutions Group": { cost: 2, esign: 4, compliance: 3, integrations: 5, govPresence: 4, angle: "DocuSign roadmap + Salesforce/ServiceNow integrations far outpace a regional reseller." },
+};
+
+const PLAYBOOK_DIMS = [
+  { key: "cost" as const,         label: "Cost",         tip: "DocuSign's cost advantage vs incumbent's licensing model" },
+  { key: "esign" as const,        label: "eSign Depth",  tip: "How much more capable our e-signature workflow is" },
+  { key: "compliance" as const,   label: "Compliance",   tip: "FedRAMP, security certifications, US data residency advantage" },
+  { key: "integrations" as const, label: "Integrations", tip: "Platform connections: Salesforce, ServiceNow, Workday, etc." },
+  { key: "govPresence" as const,  label: "Gov Presence", tip: "Public sector market footprint and reference customers" },
+];
+
+const SCORE_LABELS: Record<number, { label: string; bg: string; text: string }> = {
+  5: { label: "Strong",   bg: "rgba(34,197,94,0.25)",  text: "#4ade80" },
+  4: { label: "Good",     bg: "rgba(34,197,94,0.12)",  text: "#86efac" },
+  3: { label: "Neutral",  bg: "rgba(234,179,8,0.18)",  text: "#fbbf24" },
+  2: { label: "Weak",     bg: "rgba(249,115,22,0.18)", text: "#fb923c" },
+  1: { label: "None",     bg: "rgba(239,68,68,0.18)",  text: "#f87171" },
 };
 
 const fmt = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`;
 
+// ─── Tooltip ────────────────────────────────────────────────────────────────
+
+function InfoTooltip({ content }: { content: string }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span className="relative inline-block ml-1.5 align-middle">
+      <button
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+        onFocus={() => setVisible(true)}
+        onBlur={() => setVisible(false)}
+        className="text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
+        aria-label="More information"
+      >
+        <HelpCircle className="w-3.5 h-3.5" />
+      </button>
+      {visible && (
+        <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-800 border border-slate-600 text-xs text-slate-200 rounded-lg p-3 shadow-2xl leading-relaxed pointer-events-none">
+          {content}
+          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-600" />
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── TCV Heatmap ─────────────────────────────────────────────────────────────
+
+function heatBg(val: number, max: number, hue: string): string {
+  const t = max > 0 ? Math.min(1, val / max) : 0;
+  return `hsla(${hue}, 80%, 55%, ${0.1 + t * 0.55})`;
+}
+
+function TcvHeatmap({
+  data,
+  winBack,
+}: {
+  data: CompetitorBreakdownPoint[];
+  winBack: WinBackEntry[];
+}) {
+  const real = data.filter((c) => !["N/A", "Will Not Disclose", "Unknown"].includes(c.competitor));
+  const maxTcv = Math.max(...real.map((c) => c.totalTcv));
+  const maxCount = Math.max(...real.map((c) => c.count));
+
+  const openNowByComp: Record<string, number> = {};
+  for (const e of winBack) {
+    if (e.status === "ACT_NOW" && e.competitor) {
+      openNowByComp[e.competitor] = (openNowByComp[e.competitor] ?? 0) + 1;
+    }
+  }
+  const maxOpen = Math.max(1, ...Object.values(openNowByComp));
+
+  const avgTcvByComp = real.map((c) => c.totalTcv / c.count);
+  const maxAvg = Math.max(...avgTcvByComp);
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="text-xs text-slate-500 uppercase tracking-wide">
+            <th className="text-left px-4 py-2 font-semibold">Incumbent</th>
+            <th className="text-center px-4 py-2 font-semibold">
+              TCV at Risk
+              <InfoTooltip content="Total contract value of deals lost to this incumbent — the revenue recoverable if DocuSign wins the rebid." />
+            </th>
+            <th className="text-center px-4 py-2 font-semibold">Deals Lost</th>
+            <th className="text-center px-4 py-2 font-semibold">Avg Deal Size</th>
+            <th className="text-center px-4 py-2 font-semibold">
+              Windows Open
+              <InfoTooltip content="How many accounts lost to this incumbent are currently in an active rebid window — immediate opportunity to win back." />
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {real.map((c, i) => {
+            const avgTcv = c.totalTcv / c.count;
+            const openNow = openNowByComp[c.competitor] ?? 0;
+            return (
+              <tr key={c.competitor} className="border-t border-slate-800 hover:bg-slate-800/30 transition-colors">
+                <td className="px-4 py-3 font-semibold text-slate-100">{c.competitor}</td>
+                <td className="px-3 py-2">
+                  <div
+                    className="rounded px-3 py-2 text-center font-mono font-bold text-sm"
+                    style={{ background: heatBg(c.totalTcv, maxTcv, "0"), color: "#fca5a5" }}
+                  >
+                    {fmt(c.totalTcv)}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <div
+                    className="rounded px-3 py-2 text-center font-bold text-sm"
+                    style={{ background: heatBg(c.count, maxCount, "25"), color: "#fcd34d" }}
+                  >
+                    {c.count}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <div
+                    className="rounded px-3 py-2 text-center font-mono text-sm"
+                    style={{ background: heatBg(avgTcv, maxAvg, "200"), color: "#93c5fd" }}
+                  >
+                    {fmt(avgTcv)}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <div
+                    className="rounded px-3 py-2 text-center font-bold text-sm"
+                    style={{
+                      background: openNow > 0 ? heatBg(openNow, maxOpen, "0") : "rgba(100,100,100,0.08)",
+                      color: openNow > 0 ? "#fca5a5" : "#475569",
+                    }}
+                  >
+                    {openNow > 0 ? `${openNow} open` : "—"}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="flex items-center gap-4 mt-3 px-4">
+        <span className="text-xs text-slate-600">Intensity:</span>
+        {[
+          { label: "Low", opacity: 0.12 },
+          { label: "Med", opacity: 0.35 },
+          { label: "High", opacity: 0.65 },
+        ].map((s) => (
+          <span key={s.label} className="flex items-center gap-1.5 text-xs text-slate-500">
+            <span className="w-6 h-3 rounded" style={{ background: `hsla(0,80%,55%,${s.opacity})` }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Playbook Heatmap ─────────────────────────────────────────────────────────
+
+function PlaybookHeatmap({ competitors }: { competitors: CompetitorBreakdownPoint[] }) {
+  const real = competitors.filter((c) => !["N/A", "Will Not Disclose", "Unknown"].includes(c.competitor));
+  const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-xs text-slate-500 uppercase tracking-wide">
+              <th className="text-left px-4 py-2 font-semibold w-36">Incumbent</th>
+              {PLAYBOOK_DIMS.map((d) => (
+                <th key={d.key} className="text-center px-2 py-2 font-semibold">
+                  <span className="flex items-center justify-center gap-0.5 whitespace-nowrap">
+                    {d.label}
+                    <InfoTooltip content={d.tip} />
+                  </span>
+                </th>
+              ))}
+              <th className="text-left px-4 py-2 font-semibold">Winning Angle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {real.map((c) => {
+              const pb = PLAYBOOK_RATINGS[c.competitor];
+              return (
+                <tr key={c.competitor} className="border-t border-slate-800 hover:bg-slate-800/20 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-slate-100 text-sm">{c.competitor}</div>
+                    <div className="text-xs text-slate-500">{c.count} deal{c.count > 1 ? "s" : ""} · {fmt(c.totalTcv)}</div>
+                  </td>
+                  {pb ? PLAYBOOK_DIMS.map((d) => {
+                    const score = pb[d.key];
+                    const cfg = SCORE_LABELS[score] ?? SCORE_LABELS[3];
+                    const cellKey = `${c.competitor}-${d.key}`;
+                    return (
+                      <td key={d.key} className="px-2 py-2 text-center relative">
+                        <div
+                          onMouseEnter={() => setHoveredCell(cellKey)}
+                          onMouseLeave={() => setHoveredCell(null)}
+                          className="rounded px-2 py-2 text-xs font-semibold cursor-default transition-transform hover:scale-105 mx-auto"
+                          style={{ background: cfg.bg, color: cfg.text, minWidth: "60px" }}
+                        >
+                          {cfg.label}
+                        </div>
+                      </td>
+                    );
+                  }) : (
+                    <td colSpan={5} className="px-4 py-3 text-xs text-slate-600">No data</td>
+                  )}
+                  <td className="px-4 py-3 text-xs text-emerald-400 max-w-xs leading-relaxed">
+                    {pb?.angle}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-5 px-4 flex-wrap">
+        <span className="text-xs text-slate-600">DocuSign advantage:</span>
+        {[5, 4, 3, 2, 1].map((score) => {
+          const cfg = SCORE_LABELS[score];
+          return (
+            <span key={score} className="flex items-center gap-1.5 text-xs">
+              <span className="w-8 h-3 rounded" style={{ background: cfg.bg }} />
+              <span style={{ color: cfg.text }}>{cfg.label}</span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Small helpers ────────────────────────────────────────────────────────────
+
 function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 70 ? "bg-red-600" : score >= 55 ? "bg-amber-600" : score >= 40 ? "bg-blue-600" : "bg-slate-600";
+  const color = score >= 70 ? "bg-red-600" : score >= 55 ? "bg-amber-600" : score >= 40 ? "bg-blue-600" : "bg-slate-600";
   return (
     <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full ${color} text-white text-sm font-bold`}>
       {score}
@@ -90,7 +298,8 @@ function AlertSignal({ count, score }: { count: number; score: number | null }) 
   const color = pct >= 80 ? "text-emerald-400" : pct >= 50 ? "text-amber-400" : "text-slate-400";
   return (
     <span className={`text-xs font-medium ${color}`}>
-      {count} signal{count > 1 ? "s" : ""} · {pct}% match
+      {count} signal{count > 1 ? "s" : ""} · {pct}%
+      <InfoTooltip content="SAM.gov opportunities matching this account's search terms. Match % = how closely the opportunity title overlaps the search terms, plus a global keyword bonus of up to +20%." />
     </span>
   );
 }
@@ -108,12 +317,8 @@ function WinBackRow({ entry, rank }: { entry: WinBackEntry; rank: number }) {
   return (
     <tr className={`border-b border-slate-800 hover:bg-slate-800/50 ${entry.status === "EXPIRED" ? "opacity-50" : ""}`}>
       <td className="px-4 py-3 text-slate-500 text-sm w-8">{rank}</td>
-      <td className="px-4 py-3 w-10">
-        <ScoreBadge score={entry.winBackScore} />
-      </td>
-      <td className="px-4 py-3">
-        <StatusBadge status={entry.status} />
-      </td>
+      <td className="px-4 py-3 w-10"><ScoreBadge score={entry.winBackScore} /></td>
+      <td className="px-4 py-3"><StatusBadge status={entry.status} /></td>
       <td className="px-4 py-3 min-w-[200px]">
         <div className="flex items-center text-sm font-medium text-slate-100">
           <PriorityDot priority={entry.priority} />
@@ -132,6 +337,8 @@ function WinBackRow({ entry, rank }: { entry: WinBackEntry; rank: number }) {
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function Analytics() {
   const { data: winBack = [], isLoading: wbLoading } = useGetWinBackReadiness();
   const { data: competitors = [] } = useGetCompetitorBreakdown();
@@ -142,11 +349,10 @@ export default function Analytics() {
   const imminent = winBack.filter((e) => e.status === "IMMINENT");
   const withAlerts = winBack.filter((e) => e.alertCount > 0);
   const totalTcv = winBack.filter((e) => e.status !== "EXPIRED").reduce((s, e) => s + e.tcv, 0);
-  const topEntry = winBack[0];
 
-  const competitorChartData = competitors
-    .filter((c) => !["N/A", "Will Not Disclose", "Unknown"].includes(c.competitor))
-    .map((c) => ({ ...c, totalTcv: Math.round(c.totalTcv / 1000) }));
+  const realCompetitors = competitors.filter(
+    (c) => !["N/A", "Will Not Disclose", "Unknown"].includes(c.competitor)
+  );
 
   return (
     <Layout>
@@ -163,7 +369,7 @@ export default function Analytics() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-1.5 mb-1">
                 <Zap className="w-4 h-4 text-red-400" />
                 <span className="text-xs text-slate-400 uppercase tracking-wide">Windows Open Now</span>
               </div>
@@ -173,7 +379,7 @@ export default function Analytics() {
           </Card>
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-1.5 mb-1">
                 <Clock className="w-4 h-4 text-amber-400" />
                 <span className="text-xs text-slate-400 uppercase tracking-wide">Opening &lt;90 Days</span>
               </div>
@@ -183,9 +389,12 @@ export default function Analytics() {
           </Card>
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-1.5 mb-1">
                 <Brain className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs text-slate-400 uppercase tracking-wide">Active Signals</span>
+                <span className="text-xs text-slate-400 uppercase tracking-wide">
+                  Active Signals
+                  <InfoTooltip content="Alert Signal Quality measures how well SAM.gov procurement opportunities match the search terms for each watchlist account. Higher scores (80%+) indicate the opportunity closely matches the language of your lost deal, signaling a likely rebid." />
+                </span>
               </div>
               <div className="text-3xl font-bold text-emerald-400">{withAlerts.length}</div>
               <div className="text-xs text-slate-500 mt-1">accounts with SAM.gov procurement signals</div>
@@ -193,9 +402,12 @@ export default function Analytics() {
           </Card>
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-1.5 mb-1">
                 <TrendingUp className="w-4 h-4 text-blue-400" />
-                <span className="text-xs text-slate-400 uppercase tracking-wide">Pipeline at Stake</span>
+                <span className="text-xs text-slate-400 uppercase tracking-wide">
+                  Pipeline at Stake
+                  <InfoTooltip content="Pipeline TCV (Total Contract Value) — the total dollar value of all contracts from lost deals that are currently in or approaching a rebid window. Winning these back represents recoverable revenue." />
+                </span>
               </div>
               <div className="text-3xl font-bold text-blue-400">{fmt(totalTcv)}</div>
               <div className="text-xs text-slate-500 mt-1">total TCV across open windows</div>
@@ -229,10 +441,16 @@ export default function Analytics() {
                       <th className="px-4 py-2 text-left">Score</th>
                       <th className="px-4 py-2 text-left">Status</th>
                       <th className="px-4 py-2 text-left">Account</th>
-                      <th className="px-4 py-2 text-left">TCV</th>
+                      <th className="px-4 py-2 text-left">
+                        TCV
+                        <InfoTooltip content="Total Contract Value — the dollar size of the original deal lost to the incumbent. Higher TCV = more revenue at stake in the rebid." />
+                      </th>
                       <th className="px-4 py-2 text-left">Incumbent</th>
                       <th className="px-4 py-2 text-left">Rebid Window</th>
-                      <th className="px-4 py-2 text-left">SAM.gov Signals</th>
+                      <th className="px-4 py-2 text-left">
+                        SAM.gov Signals
+                        <InfoTooltip content="Active procurement signals detected on SAM.gov matching this account's search terms. The match % shows how closely the opportunity language aligns with the lost deal. Click the match % on the Dashboard to see a full breakdown." />
+                      </th>
                       <th className="px-4 py-2 text-left">Recommended Action</th>
                     </tr>
                   </thead>
@@ -247,89 +465,52 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        {/* Bottom row: Competitive Playbook + Charts */}
+        {/* Displacement Playbook Heatmap — full width */}
+        <Card className="bg-slate-900 border-slate-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-100 flex items-center gap-2">
+              <Users className="w-5 h-5 text-violet-400" />
+              Competitive Displacement Heatmap
+            </CardTitle>
+            <p className="text-xs text-slate-500">
+              DocuSign's advantage strength across key dimensions vs each incumbent — green = strong, red = weak
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <PlaybookHeatmap competitors={realCompetitors} />
+          </CardContent>
+        </Card>
+
+        {/* Bottom row: TCV heatmap + right charts */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Competitive Playbook */}
+          {/* TCV at risk heatmap */}
           <Card className="bg-slate-900 border-slate-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-slate-100 flex items-center gap-2">
-                <Users className="w-5 h-5 text-violet-400" />
-                Competitive Displacement Playbook
+            <CardHeader className="pb-2">
+              <CardTitle className="text-slate-100 flex items-center gap-2 text-base">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                TCV at Risk by Incumbent
+                <InfoTooltip content="Pipeline TCV grouped by the vendor that won each deal. Darker cells = higher value. 'Windows Open' shows how many of those accounts are currently accepting bids." />
               </CardTitle>
-              <p className="text-xs text-slate-500">How to unseat each incumbent — based on deal loss patterns</p>
+              <p className="text-xs text-slate-500">Cell intensity reflects relative magnitude — hover rows for context</p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {competitorChartData.map((c) => {
-                const pb = COMPETITOR_PLAYBOOK[c.competitor];
-                return (
-                  <div key={c.competitor} className="rounded-lg border border-slate-700 p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-100">{c.competitor}</span>
-                      <div className="flex gap-3 text-xs text-slate-400">
-                        <span>{c.count} deal{c.count > 1 ? "s" : ""} lost</span>
-                        <span className="font-mono text-slate-300">{fmt(c.totalTcv * 1000)}</span>
-                      </div>
-                    </div>
-                    {pb ? (
-                      <>
-                        <div className="text-xs text-amber-400">
-                          <span className="font-semibold">Their weakness:</span> {pb.weakness}
-                        </div>
-                        <div className="text-xs text-emerald-400">
-                          <span className="font-semibold">Your angle:</span> {pb.angle}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-xs text-slate-500">Build competitive intelligence from deal notes.</div>
-                    )}
-                  </div>
-                );
-              })}
+            <CardContent className="pt-0">
+              <TcvHeatmap data={competitors} winBack={winBack} />
             </CardContent>
           </Card>
 
-          {/* Right column: two charts stacked */}
+          {/* Right column */}
           <div className="space-y-6">
-            {/* TCV at risk per competitor */}
-            <Card className="bg-slate-900 border-slate-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-slate-100 flex items-center gap-2 text-base">
-                  <AlertTriangle className="w-4 h-4 text-amber-400" />
-                  TCV at Risk by Incumbent
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart
-                    data={competitorChartData}
-                    layout="vertical"
-                    margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
-                  >
-                    <CartesianGrid horizontal={false} stroke="#334155" />
-                    <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `$${v}K`} />
-                    <YAxis type="category" dataKey="competitor" tick={{ fill: "#94a3b8", fontSize: 11 }} width={100} />
-                    <Tooltip
-                      contentStyle={{ background: "#1e293b", border: "1px solid #334155", color: "#f1f5f9" }}
-                      formatter={(v: number) => [`$${v}K`, "TCV at risk"]}
-                    />
-                    <Bar dataKey="totalTcv" radius={[0, 4, 4, 0]}>
-                      {competitorChartData.map((_, i) => (
-                        <Cell key={i} fill={["hsl(0,84%,60%)", "hsl(38,92%,50%)", "hsl(221,83%,53%)", "hsl(271,81%,56%)", "hsl(160,84%,39%)", "hsl(199,89%,48%)"][i % 6]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* Match score distribution — signal quality */}
+            {/* Alert Signal Quality */}
             <Card className="bg-slate-900 border-slate-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-slate-100 flex items-center gap-2 text-base">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   Alert Signal Quality
+                  <InfoTooltip content="Alert Signal Quality is the distribution of SAM.gov match scores across all detected alerts. A score of 80–100% means the opportunity text closely overlaps with your watchlist search terms — a strong procurement signal. Scores below 40% are noise." />
                 </CardTitle>
-                <p className="text-xs text-slate-500">Match score distribution across {scoreDistribution.reduce((s, d) => s + d.count, 0)} SAM.gov alerts</p>
+                <p className="text-xs text-slate-500">
+                  Match % distribution across {scoreDistribution.reduce((s, d) => s + d.count, 0)} SAM.gov alerts
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -360,12 +541,13 @@ export default function Analytics() {
               </CardContent>
             </Card>
 
-            {/* TCV by priority */}
+            {/* TCV by Priority Tier */}
             <Card className="bg-slate-900 border-slate-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-slate-100 flex items-center gap-2 text-base">
                   <TrendingUp className="w-4 h-4 text-blue-400" />
                   Lost Deal Value by Priority Tier
+                  <InfoTooltip content="Priority Tier is the strategic grouping of each watchlist account: HIGH = largest/most urgent accounts (top 5 by TCV or strategic fit), MEDIUM = active pursuit, WATCH = long-horizon but high value, LOW = small deals or low strategic fit." />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -374,7 +556,7 @@ export default function Analytics() {
                     <CartesianGrid vertical={false} stroke="#334155" />
                     <XAxis dataKey="priority" tick={{ fill: "#94a3b8", fontSize: 11 }} />
                     <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} />
-                    <Tooltip
+                    <RechartTooltip
                       contentStyle={{ background: "#1e293b", border: "1px solid #334155", color: "#f1f5f9" }}
                       formatter={(v: number) => [fmt(v), "TCV"]}
                     />
