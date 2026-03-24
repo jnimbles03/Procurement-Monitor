@@ -8,6 +8,10 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Trust the reverse proxy (Replit's deployment layer) so Express correctly
+// sees req.secure = true and sets Secure cookies over HTTPS.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
