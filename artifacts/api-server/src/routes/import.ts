@@ -1,11 +1,11 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import * as XLSX from "xlsx";
+import { Worker } from "node:worker_threads";
 import { db } from "@workspace/db";
 import { watchlistEntriesTable } from "@workspace/db";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 interface ExcelRow {
   Agency?: string;
@@ -71,6 +71,56 @@ const ALLOWED_MIMETYPES = new Set([
 ]);
 
 const MAX_ROWS = 500;
+const PARSE_TIMEOUT_MS = 5_000;
+const PARSE_MAX_HEAP_MB = 256;
+const MAX_CONCURRENT_PARSES = 2;
+
+// Untrusted spreadsheets are parsed off the main event loop, in a separate V8
+// isolate, so a slow or hostile file cannot stall or pollute the API process.
+// `require` is the CJS require or the one the ESM build banner installs.
+const XLSX_PATH = require.resolve("xlsx");
+const PARSE_WORKER_SOURCE = `
+const { parentPort, workerData } = require("node:worker_threads");
+const XLSX = require(workerData.xlsxPath);
+const workbook = XLSX.read(workerData.buffer, {
+  type: "buffer",
+  cellDates: true,
+  sheetRows: workerData.maxRows + 1,
+});
+const sheetName = workbook.SheetNames[0];
+const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
+parentPort.postMessage(
+  sheet ? XLSX.utils.sheet_to_json(sheet, { defval: "" }).slice(0, workerData.maxRows) : null,
+);
+`;
+
+class ParseTimeoutError extends Error {}
+
+let activeParses = 0;
+
+function parseSpreadsheet(buffer: Buffer): Promise<ExcelRow[] | null> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(PARSE_WORKER_SOURCE, {
+      eval: true,
+      workerData: { buffer, xlsxPath: XLSX_PATH, maxRows: MAX_ROWS },
+      resourceLimits: { maxOldGenerationSizeMb: PARSE_MAX_HEAP_MB },
+    });
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      void worker.terminate();
+      fn();
+    };
+    const timer = setTimeout(() => {
+      finish(() => reject(new ParseTimeoutError("Spreadsheet parsing timed out")));
+    }, PARSE_TIMEOUT_MS);
+    worker.once("message", (rows: ExcelRow[] | null) => finish(() => resolve(rows)));
+    worker.once("error", (err) => finish(() => reject(err)));
+    worker.once("exit", (code) => finish(() => reject(new Error(`Spreadsheet parser exited with code ${code}`))));
+  });
+}
 
 router.post("/watchlist/import", upload.single("file"), async (req: Request, res: Response): Promise<void> => {
   try {
@@ -84,15 +134,29 @@ router.post("/watchlist/import", upload.single("file"), async (req: Request, res
       return;
     }
 
-    const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) {
-      res.status(400).json({ error: "Excel file is empty or has no sheets" });
+    if (activeParses >= MAX_CONCURRENT_PARSES) {
+      res.status(503).json({ error: "Another import is in progress. Please try again shortly." });
       return;
     }
 
-    const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet!, { defval: "" });
+    let rows: ExcelRow[] | null;
+    activeParses++;
+    try {
+      rows = await parseSpreadsheet(req.file.buffer);
+    } catch (err) {
+      if (err instanceof ParseTimeoutError) {
+        res.status(400).json({ error: "File took too long to parse. Please upload a smaller or simpler file." });
+        return;
+      }
+      throw err;
+    } finally {
+      activeParses--;
+    }
+
+    if (!rows) {
+      res.status(400).json({ error: "Excel file is empty or has no sheets" });
+      return;
+    }
 
     const validRows = rows
       .slice(0, MAX_ROWS)
