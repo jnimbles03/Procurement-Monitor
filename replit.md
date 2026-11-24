@@ -78,7 +78,7 @@ artifacts-monorepo/
 - Match scoring: word overlap + 0.2 bonus for global keyword match
 
 ## Environment Variables
-- `SAM_API_KEY` — SAM.gov API key (pre-configured: `SAM-29db880b-64f6-496f-85c9-929bbc01401f`)
+- `SAM_API_KEY` — SAM.gov API key. Store it as a Replit Secret or deployment environment variable; never commit it to `.replit` or any file in the repo.
 - `DATABASE_URL` — PostgreSQL connection string (Replit managed)
 
 ## Re-seeding
