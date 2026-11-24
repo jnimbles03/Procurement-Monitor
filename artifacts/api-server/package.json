@@ -23,7 +23,7 @@
     "node-cron": "^4.2.1",
     "pino": "^9",
     "pino-http": "^10",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/axios": "^0.14.4",
