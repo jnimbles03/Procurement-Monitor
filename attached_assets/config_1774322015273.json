@@ -1,5 +1,5 @@
 {
-  "sam_api_key": "SAM-29db880b-64f6-496f-85c9-929bbc01401f",
+  "sam_api_key": "YOUR_SAM_GOV_API_KEY_HERE",
   "email_notifications": {
     "enabled": false,
     "smtp_server": "smtp.gmail.com",
