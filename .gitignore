@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Uploaded files (internal sales exports, analyses, screenshots) must not be committed
+attached_assets/

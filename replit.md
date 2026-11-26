@@ -32,7 +32,7 @@ artifacts-monorepo/
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
 │   └── db/                 # Drizzle ORM schema + DB connection
 ├── scripts/                # Utility scripts
-│   └── src/seed.ts         # Database seeder (21 watchlist entries + config)
+│   └── src/seed.ts         # Database seeder (fictional sample watchlist + config)
 ├── pnpm-workspace.yaml     # pnpm workspace
 ├── tsconfig.base.json      # Shared TS options
 ├── tsconfig.json           # Root TS project references
@@ -43,7 +43,7 @@ artifacts-monorepo/
 
 ### Frontend Pages (React + Vite at `/`)
 1. **Dashboard** (`/`) — Summary stats (total alerts, high-priority, unique agencies, TCV), filterable alerts table with priority badges
-2. **Watchlist** (`/watchlist`) — 21 pre-seeded lost deal entries with rebid window status (UPCOMING/ACTIVE/CLOSED), add/edit/delete via modal
+2. **Watchlist** (`/watchlist`) — lost deal entries (loaded via the authenticated spreadsheet import; empty databases get fictional samples) with rebid window status (UPCOMING/ACTIVE/CLOSED), add/edit/delete via modal
 3. **Run Scan** (`/scan`) — Manual SAM.gov scan trigger with live polling progress log
 4. **Settings** (`/settings`) — SAM.gov API key status, keywords, NAICS codes, match threshold, schedule, email config
 5. **Analytics** (`/analytics`) — Charts: alerts over time, by priority, top agencies, rebid window Gantt timeline
@@ -64,7 +64,7 @@ artifacts-monorepo/
 - `GET /api/analytics/rebid-timeline` — Watchlist rebid windows for Gantt chart
 
 ### Database Tables (PostgreSQL via Drizzle)
-- `watchlist_entries` — Lost deals to monitor (21 pre-seeded)
+- `watchlist_entries` — Lost deals to monitor (real data is imported at runtime and never committed; `attached_assets/` is git-ignored)
 - `alerts` — Matched SAM.gov opportunities
 - `scan_logs` — History of scan runs with progress logs
 - `config` — Key-value app configuration
@@ -78,7 +78,7 @@ artifacts-monorepo/
 - Match scoring: word overlap + 0.2 bonus for global keyword match
 
 ## Environment Variables
-- `SAM_API_KEY` — SAM.gov API key (pre-configured: `SAM-29db880b-64f6-496f-85c9-929bbc01401f`)
+- `SAM_API_KEY` — SAM.gov API key (set as a Replit Secret; never commit the value)
 - `DATABASE_URL` — PostgreSQL connection string (Replit managed)
 
 ## Re-seeding
