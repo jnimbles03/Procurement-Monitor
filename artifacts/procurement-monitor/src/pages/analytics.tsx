@@ -361,7 +361,7 @@ export default function Analytics() {
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Win-Back Intelligence</h1>
           <p className="text-slate-400 mt-1">
-            Patterns from 21 lost deals — ranked by rebound opportunity and procurement signal strength
+            Patterns from your lost-deal watchlist — ranked by rebound opportunity and procurement signal strength
           </p>
         </div>
 
